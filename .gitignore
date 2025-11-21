@@ -1,0 +1,44 @@
+# Android/IntelliJ
+*.iml
+.idea/
+.gradle/
+local.properties
+
+# Build outputs
+build/
+**/build/
+captures/
+.externalNativeBuild/
+.cxx/
+out/
+obj/
+
+# OS / tooling noise
+.DS_Store
+Thumbs.db
+*.log
+*.hprof
+java_pid*.hprof
+
+# Gradle Wrapper (keep wrapper files tracked)
+!gradle/wrapper/gradle-wrapper.jar
+!gradle/wrapper/gradle-wrapper.properties
+
+# Binaries and packaged artifacts
+*.apk
+*.aab
+*.ap_
+*.dex
+*.class
+
+# Signing keys
+*.keystore
+*.jks
+
+# Fastlane (if used)
+fastlane/report.xml
+fastlane/Preview.html
+fastlane/screenshots
+fastlane/test_output
+
+

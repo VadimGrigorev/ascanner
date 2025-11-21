@@ -1,0 +1,16 @@
+﻿{
+ "MessageType":"userlist",
+ "Form":"login",
+ "FormId":"",
+ "SelectedId":"",
+ "Users":[
+   {
+     "Name": "Иван Иванович Навальный",
+     "Id": "ivan.vavalniy",
+   },
+   {
+     "Name": "Петр Пригожин",
+     "Id": "petr.prigozhin",
+   }
+ ]
+}

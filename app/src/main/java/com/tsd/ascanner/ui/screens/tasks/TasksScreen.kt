@@ -1,0 +1,386 @@
+package com.tsd.ascanner.ui.screens.tasks
+
+import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.material3.Button
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Checkbox
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.Icon
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ExpandLess
+import androidx.compose.material.icons.filled.ExpandMore
+import androidx.compose.material.icons.outlined.Refresh
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.tsd.ascanner.AScannerApp
+import com.tsd.ascanner.data.docs.DocsService
+import com.tsd.ascanner.ui.theme.AppTheme
+import androidx.compose.foundation.layout.Box
+import androidx.compose.ui.graphics.Color
+import androidx.compose.foundation.background
+import androidx.compose.ui.viewinterop.AndroidView
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.draw.alpha
+import kotlinx.coroutines.launch
+import android.content.BroadcastReceiver
+import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
+import com.tsd.ascanner.utils.DataWedge
+import com.tsd.ascanner.utils.ScanTriggerBus
+import kotlinx.coroutines.flow.collectLatest
+import com.tsd.ascanner.utils.ErrorBus
+import androidx.compose.runtime.LaunchedEffect
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+
+class TasksViewModel(private val service: DocsService) : ViewModel()
+
+@Composable
+fun TasksScreen(
+    paddingValues: PaddingValues,
+    onOpenDoc: (String) -> Unit
+) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val app = context.applicationContext as AScannerApp
+    val vm = viewModel<RemoteTasksViewModel>(factory = object : androidx.lifecycle.ViewModelProvider.Factory {
+        override fun <T : ViewModel> create(modelClass: Class<T>): T {
+            @Suppress("UNCHECKED_CAST")
+            return RemoteTasksViewModel(DocsService(app.apiClient, app.authService)) as T
+        }
+    })
+
+    val colors = AppTheme.colors
+    var isScanning by remember { mutableStateOf(false) }
+    var scanError by remember { mutableStateOf<String?>(null) }
+    var lastScan by remember { mutableStateOf<String?>(null) }
+    val scope = rememberCoroutineScope()
+    var isRequesting by remember { mutableStateOf(false) }
+    var loadingOrderId by remember { mutableStateOf<String?>(null) }
+
+    // Auto-hide scanned text after 3s
+    LaunchedEffect(lastScan) {
+        val hasText = !lastScan.isNullOrBlank()
+        if (hasText) {
+            kotlinx.coroutines.delay(3000)
+            lastScan = null
+        }
+    }
+
+    // Unify error presentation: route VM and scan errors to global banner
+    LaunchedEffect(vm.errorMessage) {
+        vm.errorMessage?.let { ErrorBus.emit(it) }
+    }
+    LaunchedEffect(scanError) {
+        scanError?.let { ErrorBus.emit(it) }
+    }
+
+    // Clear highlighted card when network loading for openOrder finishes
+    androidx.compose.runtime.LaunchedEffect(vm.isLoading) {
+        if (!vm.isLoading) loadingOrderId = null
+    }
+
+    // React to physical trigger press/release (vendor-agnostic via Activity)
+    androidx.compose.runtime.LaunchedEffect(Unit) {
+        ScanTriggerBus.events.collectLatest { pressed ->
+            isScanning = pressed
+        }
+    }
+
+    // Sync scan overlay with HW trigger via Zebra DataWedge (if available)
+    androidx.compose.runtime.DisposableEffect(Unit) {
+        val receiver = object : BroadcastReceiver() {
+            override fun onReceive(context: Context?, intent: Intent?) {
+                val status = intent?.let { DataWedge.parseScannerStatus(it) } ?: return
+                when (status.uppercase()) {
+                    "SCANNING" -> isScanning = true
+                    "IDLE", "WAITING" -> if (isScanning) isScanning = false
+                }
+            }
+        }
+		val filter = IntentFilter(DataWedge.NOTIFICATION_ACTION)
+		if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+			context.registerReceiver(receiver, filter, Context.RECEIVER_EXPORTED)
+		} else {
+			context.registerReceiver(receiver, filter)
+		}
+        DataWedge.registerScannerStatus(context)
+        onDispose {
+            runCatching { context.unregisterReceiver(receiver) }
+            DataWedge.unregisterScannerStatus(context)
+        }
+    }
+
+    // Always refresh tasks when screen becomes visible again
+    run {
+        val lifecycleOwner = LocalLifecycleOwner.current
+        androidx.compose.runtime.DisposableEffect(lifecycleOwner) {
+            val observer = LifecycleEventObserver { _, event ->
+                if (event == Lifecycle.Event.ON_RESUME) {
+                    vm.refresh()
+                }
+            }
+            lifecycleOwner.lifecycle.addObserver(observer)
+            onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+        }
+    }
+
+    Box(modifier = Modifier.padding(paddingValues)) {
+        // Always-on hidden input to catch wedge text even without overlay
+        AndroidView(
+            factory = { ctx ->
+                val editText = android.widget.EditText(ctx).apply {
+                    setShowSoftInputOnFocus(false)
+                    isSingleLine = true
+                    isFocusable = true
+                    isFocusableInTouchMode = true
+                    inputType = android.text.InputType.TYPE_CLASS_TEXT or
+                        android.text.InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD or
+                        android.text.InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS
+                    imeOptions = android.view.inputmethod.EditorInfo.IME_FLAG_NO_EXTRACT_UI or android.view.inputmethod.EditorInfo.IME_FLAG_NO_FULLSCREEN
+                }
+                var debounceJob: kotlinx.coroutines.Job? = null
+                fun commitIfReady(code: String) {
+                    if (code.length < 4) return
+                    lastScan = code
+                    scanError = null
+                    scope.launch {
+                        try {
+                            isRequesting = true
+                            when (val res = app.docsService.scanDocList(code)) {
+                                is com.tsd.ascanner.data.docs.ScanDocResult.Success -> {
+                                    isScanning = false
+                                    val id = res.doc.formId ?: app.docsService.currentDoc?.formId ?: code
+                                    onOpenDoc(id)
+                                }
+                                is com.tsd.ascanner.data.docs.ScanDocResult.Error -> {
+                                    scanError = res.message
+                                    isScanning = true
+                                }
+                            }
+                        } catch (e: Exception) {
+                            scanError = e.message ?: "Ошибка запроса"
+                            isScanning = true
+                        } finally {
+                            isRequesting = false
+                        }
+                    }
+                }
+                val watcher = object : android.text.TextWatcher {
+                    override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+                    override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
+                    override fun afterTextChanged(s: android.text.Editable?) {
+                        val text = s?.toString() ?: return
+                        val idx = text.indexOfFirst { ch ->
+                            val code = ch.code
+                            ((code in 0x00..0x1F) && code != 0x1D) || code == 0x7F
+                        }
+                        if (idx >= 0) {
+                            val code = text.substring(0, idx).trim()
+                            if (code.isNotEmpty()) commitIfReady(code)
+                            editText.setText("")
+                        } else {
+                            // On first chars, show overlay for UX
+                            if (!isScanning && text.length >= 1) isScanning = true
+                            debounceJob?.cancel()
+                            debounceJob = scope.launch {
+                                kotlinx.coroutines.delay(120)
+                                val code = editText.text.toString().trim()
+                                if (code.isNotEmpty()) {
+                                    commitIfReady(code)
+                                    editText.setText("")
+                                }
+                            }
+                        }
+                    }
+                }
+                editText.addTextChangedListener(watcher)
+                editText.setOnKeyListener { _, keyCode, event ->
+                    if (event.action == android.view.KeyEvent.ACTION_UP &&
+                        (keyCode == android.view.KeyEvent.KEYCODE_ENTER || keyCode == android.view.KeyEvent.KEYCODE_TAB)
+                    ) {
+                        val code = editText.text.toString().trim()
+                        if (code.isNotEmpty()) commitIfReady(code)
+                        editText.setText("")
+                        true
+                    } else false
+                }
+                editText
+            },
+            modifier = Modifier
+                .alpha(0f)
+                .fillMaxWidth()
+                .height(1.dp),
+            update = { v -> v.post { v.requestFocus() } }
+        )
+
+        LazyColumn(modifier = Modifier.fillMaxWidth()) {
+            // Header: filter and errors
+            item {
+                Column(modifier = Modifier.padding(12.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Checkbox(checked = vm.showOnlyOpen, onCheckedChange = { vm.toggleShowOnlyOpen() })
+                        Text(text = "скрыть завершенные", color = colors.textSecondary)
+                    }
+                }
+            }
+
+            // Filter tasks/orders
+            val filteredTasks = vm.tasks.map { t ->
+                val orders = if (!vm.showOnlyOpen) t.orders else t.orders.filter { (it.status ?: "").lowercase() != "closed" }
+                t.copy(orders = orders)
+            }.filter { it.orders.isNotEmpty() }
+
+            items(filteredTasks) { t ->
+                val original = vm.tasks.firstOrNull { it.id == t.id }
+                val totalOrders = original?.orders?.size ?: 0
+                val closedCount = original?.orders?.count { (it.status ?: "").lowercase() == "closed" } ?: 0
+                val headerBg = if (totalOrders > 0 && closedCount == totalOrders) colors.statusDoneBg else colors.statusTodoBg
+                val headerTextColor = colors.textPrimary
+                val headerIconTint = headerTextColor
+
+                Card(
+                    modifier = Modifier
+                        .padding(horizontal = 8.dp, vertical = 6.dp)
+                        .fillMaxWidth()
+                        .clickable { vm.toggleTask(t.id) },
+                    colors = CardDefaults.cardColors(containerColor = headerBg)
+                ) {
+                    Column(modifier = Modifier.padding(12.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .padding(end = 8.dp),
+                                text = t.name,
+                                style = MaterialTheme.typography.titleMedium,
+                                color = headerTextColor,
+                                // allow wrapping to multiple lines to keep ratio+indicator visible
+                            )
+                            val expanded = vm.expandedTaskIds.contains(t.id)
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(
+                                    text = "$closedCount/$totalOrders",
+                                    color = headerTextColor
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Icon(
+                                    imageVector = if (expanded) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore,
+                                    contentDescription = if (expanded) "Свернуть" else "Развернуть",
+                                    tint = headerIconTint
+                                )
+                            }
+                        }
+                    }
+                }
+
+                if (vm.expandedTaskIds.contains(t.id)) {
+                    t.orders.forEach { o ->
+                        val closed = (o.status ?: "").lowercase() == "closed"
+                        val orderBg = if (closed) colors.statusDoneBg else colors.statusTodoBg
+                        val orderTextColor = if (closed) colors.textPrimary else colors.textPrimary
+                        val orderSubTextColor = if (closed) colors.textSecondary else colors.textSecondary
+                        val isLoadingThis = vm.isLoading && loadingOrderId == o.id
+                        val orderContainer = if (isLoadingThis) Color(0xFFFFF59D) else orderBg
+                    Card(
+                            modifier = Modifier
+                                .padding(horizontal = 12.dp, vertical = 6.dp)
+                            .fillMaxWidth()
+                            .clickable {
+                                loadingOrderId = o.id
+                                vm.openOrder(o.id) { onOpenDoc(o.id) }
+                            },
+                            colors = CardDefaults.cardColors(containerColor = orderContainer)
+                        ) {
+                            Column(modifier = Modifier.padding(12.dp)) {
+                                Text(text = o.name, color = orderTextColor)
+                                val c1 = o.comment1
+                                if (!c1.isNullOrBlank()) Text(text = c1, color = orderSubTextColor)
+                                val c2 = o.comment2
+                                if (!c2.isNullOrBlank()) Text(text = c2, color = orderSubTextColor)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // Floating scan message at bottom; auto hides after 3s
+        if (!lastScan.isNullOrBlank()) {
+            Column(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .fillMaxWidth()
+                    .padding(8.dp)
+                    .background(Color(0xFFFFF59D))
+                    .padding(10.dp)
+            ) {
+                val last = lastScan
+                if (!last.isNullOrBlank()) {
+                    Text(text = last, color = Color.Black)
+                }
+            }
+        }
+
+        // Global loading overlay without dimming
+        if (vm.isLoading) {
+            Box(modifier = Modifier.fillMaxSize()) {
+                CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
+            }
+        }
+
+        Column(
+            modifier = Modifier
+                .align(Alignment.BottomEnd)
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+            horizontalAlignment = Alignment.End
+        ) {
+            FloatingActionButton(
+                onClick = { vm.refresh() },
+                containerColor = colors.secondary,
+                contentColor = colors.textPrimary
+            ) {
+                Icon(imageVector = Icons.Outlined.Refresh, contentDescription = "Обновить")
+            }
+        }
+    }
+
+    val activity = context as? ComponentActivity
+    BackHandler { activity?.finish() }
+}
+
+
+

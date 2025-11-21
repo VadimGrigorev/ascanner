@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">AScanner</string>
+    <string name="tab_tasks">Задания</string>
+    <string name="action_scan">Сканировать</string>
+    <!-- Removed settings and camera strings -->
+    <string name="user_select">Выберите пользователя</string>
+    <string name="user_label">Пользователь</string>
+    <string name="password_label">Пароль</string>
+    <string name="login_action">Войти</string>
+</resources>
+
+
