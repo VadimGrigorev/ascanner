@@ -14,6 +14,7 @@ import java.net.HttpURLConnection
 import java.net.URL
 import javax.net.ssl.HttpsURLConnection
 import com.tsd.ascanner.utils.ErrorBus
+import com.tsd.ascanner.utils.AppEventBus
 
 class ApiClient(
     private val gson: Gson = Gson()
@@ -118,10 +119,15 @@ class ApiClient(
             if (element != null && element.isJsonObject) {
                 val obj = element.asJsonObject
                 val mt = if (obj.has("MessageType")) obj.get("MessageType").asString else null
+				val form = if (obj.has("Form")) obj.get("Form").asString else null
                 if (mt != null && mt.equals("error", ignoreCase = true)) {
                     val msg = if (obj.has("Message")) obj.get("Message").asString else "Ошибка"
-                    // Emit to global error bus for top-of-screen banner
+					// Emit to global error bus for top-of-screen banner
                     ErrorBus.emit(msg)
+					// Navigate to login if server instructs "Form":"login"
+					if (form != null && form.equals("login", ignoreCase = true)) {
+						AppEventBus.requireLogin()
+					}
                     throw IllegalStateException(msg)
                 }
             }

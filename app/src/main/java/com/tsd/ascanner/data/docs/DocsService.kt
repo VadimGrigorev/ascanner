@@ -136,6 +136,11 @@ class DocsService(
         currentPos = pos
         return ScanPosResult.Success(pos)
     }
+
+    fun clear() {
+        currentDoc = null
+        currentPos = null
+    }
 }
 
 sealed interface ScanDocResult {

@@ -28,6 +28,8 @@ import com.tsd.ascanner.ui.theme.AScannerTheme
 import android.view.KeyEvent
 import com.tsd.ascanner.utils.ScanTriggerBus
 import com.tsd.ascanner.utils.ErrorBus
+import com.tsd.ascanner.utils.AppEvent
+import com.tsd.ascanner.utils.AppEventBus
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -48,6 +50,7 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         WindowCompat.setDecorFitsSystemWindows(window, false)
+		val app = applicationContext as AScannerApp
 
         setContent {
             AScannerTheme(dynamicColor = false) {
@@ -62,6 +65,24 @@ class MainActivity : ComponentActivity() {
                         globalError = msg
                     }
                 }
+				LaunchedEffect(Unit) {
+					AppEventBus.events.collectLatest { ev ->
+						when (ev) {
+							is AppEvent.RequireLogin -> {
+								// Clear local session and in-memory document state
+								app.authService.clearLocalSession()
+								app.docsService.clear()
+								val route = navController.currentBackStackEntry?.destination?.route
+								if (route != "login") {
+									navController.navigate("login") {
+										popUpTo(navController.graph.startDestinationId) { inclusive = true }
+										launchSingleTop = true
+									}
+								}
+							}
+						}
+					}
+				}
                 Scaffold(
                     modifier = Modifier.fillMaxSize(),
                     contentWindowInsets = WindowInsets.safeDrawing,

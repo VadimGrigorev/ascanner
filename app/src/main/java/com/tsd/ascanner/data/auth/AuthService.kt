@@ -54,6 +54,10 @@ class AuthService(
         // Ignore response and errors; best-effort ping
         runCatching { apiClient.postForJsonElement("/logout", req) }
     }
+
+	fun clearLocalSession() {
+		bearer = null
+	}
 }
 
 
