@@ -21,6 +21,7 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.CircularProgressIndicator
@@ -48,6 +49,7 @@ import androidx.compose.foundation.background
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.focus.onFocusChanged
 import kotlinx.coroutines.launch
 import android.content.BroadcastReceiver
 import android.content.Context
@@ -85,6 +87,7 @@ fun TasksScreen(
     val scope = rememberCoroutineScope()
     var isRequesting by remember { mutableStateOf(false) }
     var loadingOrderId by remember { mutableStateOf<String?>(null) }
+	var searchFocused by remember { mutableStateOf(false) }
 
     // Auto-hide scanned text after 3s
     LaunchedEffect(lastScan) {
@@ -239,7 +242,7 @@ fun TasksScreen(
                 .alpha(0f)
                 .fillMaxWidth()
                 .height(1.dp),
-            update = { v -> v.post { v.requestFocus() } }
+			update = { v -> v.post { if (!searchFocused) v.requestFocus() } }
         )
 
         LazyColumn(modifier = Modifier.fillMaxWidth()) {
@@ -250,14 +253,72 @@ fun TasksScreen(
                         Checkbox(checked = vm.showOnlyOpen, onCheckedChange = { vm.toggleShowOnlyOpen() })
                         Text(text = "скрыть завершенные", color = colors.textSecondary)
                     }
+					Spacer(Modifier.height(8.dp))
+					OutlinedTextField(
+						value = vm.searchQuery,
+						onValueChange = { value ->
+							vm.updateSearchQuery(value)
+							if (searchFocused) {
+								val marker = "@!@!@NEWDOCUMENT!@!@!"
+								val idx = value.indexOf(marker)
+								if (idx >= 0) {
+									val code = value.substring(idx).trim()
+									// Очистим поиск, чтобы не триггерить повторно
+									vm.updateSearchQuery("")
+									lastScan = code
+									scanError = null
+									scope.launch {
+										try {
+											isRequesting = true
+											when (val res = app.docsService.scanDocList(code)) {
+												is com.tsd.ascanner.data.docs.ScanDocResult.Success -> {
+													isScanning = false
+													val id = res.doc.formId ?: app.docsService.currentDoc?.formId ?: code
+													onOpenDoc(id)
+												}
+												is com.tsd.ascanner.data.docs.ScanDocResult.Error -> {
+													scanError = res.message
+													isScanning = true
+												}
+											}
+										} catch (e: Exception) {
+											scanError = e.message ?: "Ошибка запроса"
+											isScanning = true
+										} finally {
+											isRequesting = false
+										}
+									}
+								}
+							}
+						},
+						modifier = Modifier
+							.fillMaxWidth()
+							.onFocusChanged { searchFocused = it.isFocused },
+						label = { Text(text = "Поиск") },
+						singleLine = true
+					)
                 }
             }
 
-            // Filter tasks/orders
-            val filteredTasks = vm.tasks.map { t ->
-                val orders = if (!vm.showOnlyOpen) t.orders else t.orders.filter { (it.status ?: "").lowercase() != "closed" }
-                t.copy(orders = orders)
-            }.filter { it.orders.isNotEmpty() }
+			// Filter tasks/orders by open/closed and search query
+			val q = vm.searchQuery.trim().lowercase()
+			val filteredTasks = vm.tasks.mapNotNull { t ->
+				val baseOrders = if (!vm.showOnlyOpen) t.orders else t.orders.filter { (it.status ?: "").lowercase() != "closed" }
+				if (q.isEmpty()) {
+					if (baseOrders.isNotEmpty()) t.copy(orders = baseOrders) else null
+				} else {
+					val taskMatch = t.name.contains(q, ignoreCase = true) || t.id.contains(q, ignoreCase = true)
+					val ordersMatched = baseOrders.filter { o ->
+						o.name.contains(q, ignoreCase = true) ||
+						(o.comment1?.contains(q, ignoreCase = true) == true) ||
+						(o.comment2?.contains(q, ignoreCase = true) == true) ||
+						((o.status ?: "").contains(q, ignoreCase = true)) ||
+						o.id.contains(q, ignoreCase = true)
+					}
+					val finalOrders = if (taskMatch) baseOrders else ordersMatched
+					if (taskMatch || finalOrders.isNotEmpty()) t.copy(orders = finalOrders) else null
+				}
+			}
 
             items(filteredTasks) { t ->
                 val original = vm.tasks.firstOrNull { it.id == t.id }

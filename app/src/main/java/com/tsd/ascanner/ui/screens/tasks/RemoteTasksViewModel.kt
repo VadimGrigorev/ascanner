@@ -22,6 +22,8 @@ class RemoteTasksViewModel(
         private set
     var errorMessage by mutableStateOf<String?>(null)
         private set
+		var searchQuery by mutableStateOf("")
+			private set
 
     fun refresh() {
         if (isLoading) return
@@ -67,6 +69,10 @@ class RemoteTasksViewModel(
             }
         }
     }
+
+	fun updateSearchQuery(value: String) {
+		searchQuery = value
+	}
 }
 
 
