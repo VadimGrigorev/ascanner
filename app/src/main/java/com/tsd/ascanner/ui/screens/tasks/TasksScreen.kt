@@ -323,8 +323,17 @@ fun TasksScreen(
             items(filteredTasks) { t ->
                 val original = vm.tasks.firstOrNull { it.id == t.id }
                 val totalOrders = original?.orders?.size ?: 0
-                val closedCount = original?.orders?.count { (it.status ?: "").lowercase() == "closed" } ?: 0
-                val headerBg = if (totalOrders > 0 && closedCount == totalOrders) colors.statusDoneBg else colors.statusTodoBg
+                val statuses = original?.orders?.map { (it.status ?: "").lowercase() } ?: emptyList()
+                val hasError = statuses.any { it == "error" }
+                val allClosed = totalOrders > 0 && statuses.all { it == "closed" }
+                val hasPending = statuses.any { it == "pending" }
+                val closedCount = statuses.count { it == "closed" }
+                val headerBg = when {
+                    hasError -> colors.statusErrorBg
+                    allClosed -> colors.statusDoneBg
+                    hasPending -> colors.statusPendingBg
+                    else -> colors.statusTodoBg
+                }
                 val headerTextColor = colors.textPrimary
                 val headerIconTint = headerTextColor
 
@@ -369,10 +378,15 @@ fun TasksScreen(
 
                 if (vm.expandedTaskIds.contains(t.id)) {
                     t.orders.forEach { o ->
-                        val closed = (o.status ?: "").lowercase() == "closed"
-                        val orderBg = if (closed) colors.statusDoneBg else colors.statusTodoBg
-                        val orderTextColor = if (closed) colors.textPrimary else colors.textPrimary
-                        val orderSubTextColor = if (closed) colors.textSecondary else colors.textSecondary
+                        val st = (o.status ?: "").lowercase()
+                        val orderBg = when (st) {
+                            "closed" -> colors.statusDoneBg
+                            "pending" -> colors.statusPendingBg
+                            "error" -> colors.statusErrorBg
+                            else -> colors.statusTodoBg
+                        }
+                        val orderTextColor = colors.textPrimary
+                        val orderSubTextColor = colors.textSecondary
                         val isLoadingThis = vm.isLoading && loadingOrderId == o.id
                         val orderContainer = if (isLoadingThis) Color(0xFFFFF59D) else orderBg
                     Card(

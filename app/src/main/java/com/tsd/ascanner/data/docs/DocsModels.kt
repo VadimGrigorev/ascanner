@@ -93,7 +93,9 @@ data class PosResponse(
 data class PosItemDto(
     @SerializedName("Name") val name: String,
     @SerializedName("Id") val id: String,
-    @SerializedName("Text") val text: String? = null
+    @SerializedName("Text") val text: String? = null,
+    @SerializedName("StatusText") val statusText: String? = null,
+    @SerializedName("Status") val status: String? = null
 )
 
 // Delete requests for POS

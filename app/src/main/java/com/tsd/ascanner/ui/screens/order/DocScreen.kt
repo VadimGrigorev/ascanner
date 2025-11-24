@@ -181,12 +181,12 @@ fun DocScreen(
                     if (total > 0) {
                         Text(text = "$done/$total выполнено", color = colors.textPrimary, modifier = Modifier.padding(top = 12.dp))
                         val progress = (done.toFloat() / total.toFloat()).coerceIn(0f, 1f)
-                        androidx.compose.foundation.layout.Box(
+						androidx.compose.foundation.layout.Box(
                             modifier = Modifier
                                 .padding(top = 8.dp)
                                 .fillMaxWidth()
                                 .height(6.dp)
-                                .background(colors.statusTodoBg, shape = androidx.compose.foundation.shape.RoundedCornerShape(3.dp))
+								.background(colors.progressTrack, shape = androidx.compose.foundation.shape.RoundedCornerShape(3.dp))
                         ) {
                             val isFull = progress >= 0.999f
                             val barShape = if (isFull) {
@@ -208,11 +208,16 @@ fun DocScreen(
             }
 
             val itemsList = doc?.items.orEmpty()
-            items(itemsList) { it ->
-                val isClosed = (it.status ?: "").lowercase() == "closed"
-                val bg = if (isClosed) colors.statusDoneBg else colors.statusTodoBg
-                val textColor = if (isClosed) colors.textPrimary else colors.textPrimary
-                val subColor = if (isClosed) colors.textSecondary else colors.textSecondary
+			items(itemsList) { it ->
+				val st = (it.status ?: "").lowercase()
+				val bg = when (st) {
+					"closed" -> colors.statusDoneBg
+					"pending" -> colors.statusPendingBg
+					"error" -> colors.statusErrorBg
+					else -> colors.statusTodoBg
+				}
+				val textColor = colors.textPrimary
+				val subColor = colors.textSecondary
                 val isLoadingThis = loadingPosId == it.id
                 val containerColor = if (isLoadingThis) Color(0xFFFFF59D) else bg
                 Card(

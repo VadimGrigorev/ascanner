@@ -159,18 +159,30 @@ fun PosScreen(
                 }
             }
 
-            val itemsList = pos?.items.orEmpty()
-            val allClosed = (pos?.status ?: "").lowercase() == "closed"
-            val bg = if (allClosed) colors.statusDoneBg else colors.statusTodoBg
-            val textColor = if (allClosed) colors.textPrimary else colors.textPrimary
-            val subColor = if (allClosed) colors.textSecondary else colors.textSecondary
+			val itemsList = pos?.items.orEmpty()
+			val stDefault = (pos?.status ?: "").lowercase()
+			val defaultBg = when (stDefault) {
+				"closed" -> colors.statusDoneBg
+				"pending" -> colors.statusPendingBg
+				"error" -> colors.statusErrorBg
+				else -> colors.statusTodoBg
+			}
+            val textColor = colors.textPrimary
+            val subColor = colors.textSecondary
 
             items(itemsList) { it ->
+				val stItem = (it.status ?: pos?.status ?: "").lowercase()
+				val itemBg = when (stItem) {
+					"closed" -> colors.statusDoneBg
+					"pending" -> colors.statusPendingBg
+					"error" -> colors.statusErrorBg
+					else -> defaultBg
+				}
                 Card(
                     modifier = Modifier
                         .padding(horizontal = 12.dp, vertical = 6.dp)
                         .fillMaxWidth(),
-                    colors = CardDefaults.cardColors(containerColor = bg)
+					colors = CardDefaults.cardColors(containerColor = itemBg)
                 ) {
                     Column(modifier = Modifier.padding(12.dp)) {
                         Row(

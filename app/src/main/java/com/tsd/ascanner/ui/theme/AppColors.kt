@@ -15,8 +15,10 @@ data class AppColors(
     val progress: Color,       // rgb(52, 199, 89) — прогресс для завершённых
     val progressTodo: Color,   // rgb(199, 203, 209) — прогресс для незавершённых
     val progressTrack: Color,  // rgb(229, 231, 235) — трек полосы прогресса
-    val statusDoneBg: Color,   // rgb(231, 247, 236) — фон карточек завершённых задач/заказов
-    val statusTodoBg: Color    // rgb(242, 244, 247) — фон карточек незавершённых задач/заказов
+	val statusDoneBg: Color,   // фон карточек завершённых задач/заказов
+	val statusTodoBg: Color,   // фон карточек незавершённых задач/заказов (open)
+	val statusPendingBg: Color, // фон карточек в ожидании (pending)
+	val statusErrorBg: Color   // фон карточек с ошибкой (error)
 )
 
 val LocalAppColors = staticCompositionLocalOf {
@@ -30,8 +32,10 @@ val LocalAppColors = staticCompositionLocalOf {
         progress = Color(0xFF34C759),     // rgb(52, 199, 89) — прогресс завершённых
         progressTodo = Color(0xFFC7CBD1), // rgb(199, 203, 209) — прогресс незавершённых
         progressTrack = Color(0xFFE5E7EB),// rgb(229, 231, 235) — трек прогресса
-        statusDoneBg = Color(0xFFE7F7EC), // rgb(231, 247, 236) — фон завершённых карточек
-        statusTodoBg = Color(30, 136, 229)  // rgb(30, 136, 229) — фон незавершённых карточек
+		statusDoneBg = Color(0xFFE7F7EC),
+		statusTodoBg = Color(30, 136, 229),
+		statusPendingBg = Color(0xFFCDD1C4),
+		statusErrorBg = Color(0xFFFF595E)
     )
 }
 
@@ -46,8 +50,10 @@ object AppPalettes {
         progress = Color(0xFF34C759),     // rgb(52, 199, 89) — прогресс OK
         progressTodo = Color(0xFFC7CBD1), // rgb(199, 203, 209) — прогресс TODO
         progressTrack = Color(0xFFE5E7EB),// rgb(229, 231, 235) — трек прогресса
-        statusDoneBg = Color(52, 199, 89), // rgb(52, 199, 89) — прогресс OK
-        statusTodoBg = Color(30, 136, 229)  // rgb(30, 136, 229) — фон TODO
+		statusDoneBg = Color(52, 199, 89),
+		statusTodoBg = Color(30, 136, 229),
+		statusPendingBg = Color(0xFFCDD1C4),
+		statusErrorBg = Color(0xFFFF595E)
     )
 }
 
