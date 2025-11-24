@@ -39,6 +39,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.tsd.ascanner.data.auth.AuthService
 import com.tsd.ascanner.data.auth.UserDto
 import com.tsd.ascanner.data.net.ApiClient
+import com.tsd.ascanner.data.net.ServerSettings
 import com.tsd.ascanner.ui.theme.AppTheme
 import kotlinx.coroutines.launch
 import com.tsd.ascanner.AScannerApp
@@ -129,6 +130,7 @@ fun LoginScreen(
     val ctx = androidx.compose.ui.platform.LocalContext.current
     val app = ctx.applicationContext as AScannerApp
     val scope = rememberCoroutineScope()
+	var serverUrl by remember { mutableStateOf(ServerSettings.getBaseUrl(ctx)) }
     val vm = viewModel<LoginViewModel>(factory = object : androidx.lifecycle.ViewModelProvider.Factory {
         override fun <T : ViewModel> create(modelClass: Class<T>): T {
             @Suppress("UNCHECKED_CAST")
@@ -151,6 +153,19 @@ fun LoginScreen(
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
+		OutlinedTextField(
+			value = serverUrl,
+			onValueChange = { value ->
+				serverUrl = value
+				ServerSettings.setBaseUrl(ctx, value)
+			},
+			modifier = Modifier
+				.fillMaxWidth(),
+			label = { Text(text = "Адрес сервера") },
+			singleLine = true
+		)
+		Spacer(Modifier.height(12.dp))
+
         // Hidden input to capture hardware scanner text at login screen
         AndroidView(
             factory = { ctx ->

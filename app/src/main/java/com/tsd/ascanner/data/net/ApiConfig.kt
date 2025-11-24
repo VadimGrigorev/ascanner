@@ -1,10 +1,11 @@
 package com.tsd.ascanner.data.net
 
 import com.tsd.ascanner.BuildConfig
+import com.tsd.ascanner.AScannerApp
 
 object ApiConfig {
     val baseUrl: String
-        get() = BuildConfig.API_BASE_URL
+		get() = ServerSettings.getBaseUrl(AScannerApp.instance)
 }
 
 

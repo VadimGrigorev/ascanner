@@ -13,8 +13,14 @@ class AScannerApp : Application() {
     lateinit var docsService: DocsService
         private set
 
+	companion object {
+		lateinit var instance: AScannerApp
+			private set
+	}
+
     override fun onCreate() {
         super.onCreate()
+		instance = this
         apiClient = ApiClient()
         authService = AuthService(apiClient)
         docsService = DocsService(apiClient, authService)
