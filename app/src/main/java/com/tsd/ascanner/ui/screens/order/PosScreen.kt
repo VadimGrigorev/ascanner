@@ -80,23 +80,29 @@ fun PosScreen(
     // Refresh POS whenever screen is resumed (avoid stale cache)
     run {
         val lifecycleOwner = LocalLifecycleOwner.current
-        androidx.compose.runtime.DisposableEffect(lifecycleOwner) {
+		// Skip the very first ON_RESUME after entering screen (prefetched in DocScreen)
+		val skipNextOnResume = remember { mutableStateOf(true) }
+		androidx.compose.runtime.DisposableEffect(lifecycleOwner) {
             val observer = LifecycleEventObserver { _, event ->
                 if (event == Lifecycle.Event.ON_RESUME) {
-                    val currentFormId = posState.value?.formId ?: app.docsService.currentPos?.formId
-                    if (!currentFormId.isNullOrBlank()) {
-                        scope.launch {
-                            try {
-                                posLoading.value = true
-                                val fresh = app.docsService.fetchPos(currentFormId)
-                                app.docsService.currentPos = fresh
-                                posState.value = fresh
-                            } catch (_: Exception) {
-                            } finally {
-                                posLoading.value = false
-                            }
-                        }
-                    }
+					if (skipNextOnResume.value) {
+						skipNextOnResume.value = false
+					} else {
+						val currentFormId = posState.value?.formId ?: app.docsService.currentPos?.formId
+						if (!currentFormId.isNullOrBlank()) {
+							scope.launch {
+								try {
+									posLoading.value = true
+									val fresh = app.docsService.fetchPos(currentFormId)
+									app.docsService.currentPos = fresh
+									posState.value = fresh
+								} catch (_: Exception) {
+								} finally {
+									posLoading.value = false
+								}
+							}
+						}
+					}
                 }
             }
             lifecycleOwner.lifecycle.addObserver(observer)
