@@ -330,6 +330,19 @@ fun LoginScreen(
         }
     }
 
+	// Version label at bottom-right
+	androidx.compose.foundation.layout.Box(
+		modifier = Modifier
+			.fillMaxSize()
+			.padding(16.dp)
+	) {
+		Text(
+			text = "0.98 тестовая версия",
+			modifier = Modifier.align(Alignment.BottomStart),
+			color = colors.textSecondary
+		)
+	}
+
     BackHandler(enabled = false) { /* disable back from login */ }
 }
 
