@@ -390,7 +390,10 @@ fun DocScreen(
 
         if (globalLoading.value || loadingPosId != null) {
             Box(modifier = Modifier.fillMaxSize()) {
-                CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
+                CircularProgressIndicator(
+                    modifier = Modifier.align(Alignment.Center),
+                    color = Color(0xFF30323D)
+                )
             }
         }
     }

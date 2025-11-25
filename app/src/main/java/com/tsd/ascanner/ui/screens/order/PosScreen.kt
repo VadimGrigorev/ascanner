@@ -337,7 +337,10 @@ fun PosScreen(
         // Progress overlay during deletion or refresh
         if (isRequesting.value || posLoading.value) {
             Box(modifier = Modifier.fillMaxSize()) {
-                CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
+                CircularProgressIndicator(
+                    modifier = Modifier.align(Alignment.Center),
+                    color = Color(0xFF30323D)
+                )
             }
         }
 

@@ -388,7 +388,7 @@ fun TasksScreen(
                         val orderTextColor = colors.textPrimary
                         val orderSubTextColor = colors.textSecondary
                         val isLoadingThis = vm.isLoading && loadingOrderId == o.id
-                        val orderContainer = if (isLoadingThis) Color(0xFFFFF44F) else orderBg
+                        val orderContainer = if (isLoadingThis) Color(0xFF30323D) else orderBg
                     Card(
                             modifier = Modifier
                                 .padding(horizontal = 12.dp, vertical = 6.dp)
@@ -432,7 +432,10 @@ fun TasksScreen(
         // Global loading overlay without dimming
         if (vm.isLoading) {
             Box(modifier = Modifier.fillMaxSize()) {
-                CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
+                CircularProgressIndicator(
+                    modifier = Modifier.align(Alignment.Center),
+                    color = Color(0xFF30323D)
+                )
             }
         }
 

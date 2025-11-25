@@ -301,7 +301,8 @@ fun LoginScreen(
                     modifier = Modifier
                         .size(20.dp)
                         .align(Alignment.CenterVertically),
-                    strokeWidth = 2.dp
+                    strokeWidth = 2.dp,
+                    color = androidx.compose.ui.graphics.Color(0xFF30323D)
                 )
             } else {
                 Text(text = androidx.compose.ui.res.stringResource(id = com.tsd.ascanner.R.string.login_action))
