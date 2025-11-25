@@ -44,6 +44,7 @@ import com.tsd.ascanner.ui.theme.AppTheme
 import kotlinx.coroutines.launch
 import com.tsd.ascanner.AScannerApp
 import com.tsd.ascanner.utils.ErrorBus
+import com.tsd.ascanner.utils.UserMessageMapper
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.viewinterop.AndroidView
@@ -75,7 +76,7 @@ class LoginViewModel(
                 users = fetched
                 selectedUser = fetched.firstOrNull()
             } catch (e: Exception) {
-                errorMessage = e.message ?: "Ошибка загрузки пользователей"
+                errorMessage = UserMessageMapper.map(e) ?: e.message ?: "Ошибка загрузки пользователей"
             } finally {
                 loading = false
             }
@@ -113,7 +114,7 @@ class LoginViewModel(
                     }
                 }
             } catch (e: Exception) {
-                errorMessage = e.message ?: "Ошибка сети"
+                errorMessage = UserMessageMapper.map(e) ?: e.message ?: "Ошибка сети"
             } finally {
                 loading = false
             }
@@ -193,7 +194,7 @@ fun LoginScreen(
                                 }
                             }
                         } catch (e: Exception) {
-                            ErrorBus.emit(e.message ?: "Ошибка сети")
+                            ErrorBus.emit(UserMessageMapper.map(e) ?: e.message ?: "Ошибка сети")
                         }
                     }
                 }
