@@ -388,7 +388,7 @@ fun TasksScreen(
                         val orderTextColor = colors.textPrimary
                         val orderSubTextColor = colors.textSecondary
                         val isLoadingThis = vm.isLoading && loadingOrderId == o.id
-                        val orderContainer = if (isLoadingThis) Color(0xFFFFF59D) else orderBg
+                        val orderContainer = if (isLoadingThis) Color(0xFFFFF44F) else orderBg
                     Card(
                             modifier = Modifier
                                 .padding(horizontal = 12.dp, vertical = 6.dp)

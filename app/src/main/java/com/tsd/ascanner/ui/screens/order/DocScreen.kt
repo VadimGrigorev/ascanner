@@ -219,7 +219,7 @@ fun DocScreen(
 				val textColor = colors.textPrimary
 				val subColor = colors.textSecondary
                 val isLoadingThis = loadingPosId == it.id
-                val containerColor = if (isLoadingThis) Color(0xFFFFF59D) else bg
+                val containerColor = if (isLoadingThis) Color(0xFFFFF44F) else bg
                 Card(
                     modifier = Modifier
                         .padding(horizontal = 12.dp, vertical = 6.dp)
