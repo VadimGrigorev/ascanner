@@ -166,6 +166,21 @@ fun DocScreen(
         }
     }
 
+	// Auto-refresh every 5 seconds while on this screen
+	LaunchedEffect(formId) {
+		while (true) {
+			kotlinx.coroutines.delay(5000)
+			if (!globalLoading.value && !isRequesting.value) {
+				try {
+					val fresh = docsService.fetchDoc(formId)
+					docsService.currentDoc = fresh
+					docState.value = fresh
+				} catch (_: Exception) {
+				}
+			}
+		}
+	}
+
     Box(modifier = Modifier.fillMaxSize().padding(paddingValues)) {
         LazyColumn(modifier = Modifier.fillMaxSize()) {
             item {

@@ -119,6 +119,24 @@ fun PosScreen(
         scanError.value?.let { ErrorBus.emit(it) }
     }
 
+	// Auto-refresh every 5 seconds while on this screen
+	LaunchedEffect(Unit) {
+		while (true) {
+			kotlinx.coroutines.delay(5000)
+			if (!posLoading.value && !isRequesting.value) {
+				val currentFormId = posState.value?.formId ?: app.docsService.currentPos?.formId
+				if (!currentFormId.isNullOrBlank()) {
+					try {
+						val fresh = app.docsService.fetchPos(currentFormId)
+						app.docsService.currentPos = fresh
+						posState.value = fresh
+					} catch (_: Exception) {
+					}
+				}
+			}
+		}
+	}
+
     // Sync scan overlay with HW trigger via Zebra DataWedge (if available)
     androidx.compose.runtime.DisposableEffect(Unit) {
         val receiver = object : BroadcastReceiver() {

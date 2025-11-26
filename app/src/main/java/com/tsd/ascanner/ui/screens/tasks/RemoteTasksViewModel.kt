@@ -24,9 +24,12 @@ class RemoteTasksViewModel(
         private set
 		var searchQuery by mutableStateOf("")
 			private set
+		var showLoadingIndicator by mutableStateOf(true)
+			private set
 
-    fun refresh() {
+	fun refresh(userInitiated: Boolean = true) {
         if (isLoading) return
+		showLoadingIndicator = userInitiated
         isLoading = true
         errorMessage = null
         viewModelScope.launch {
@@ -37,6 +40,7 @@ class RemoteTasksViewModel(
                 errorMessage = e.message ?: "Ошибка загрузки документов"
             } finally {
                 isLoading = false
+				showLoadingIndicator = true
             }
         }
     }
@@ -53,8 +57,9 @@ class RemoteTasksViewModel(
         showOnlyOpen = !showOnlyOpen
     }
 
-    fun openOrder(orderId: String, onSuccessOpen: () -> Unit) {
+	fun openOrder(orderId: String, onSuccessOpen: () -> Unit) {
         if (isLoading) return
+		showLoadingIndicator = true
         isLoading = true
         errorMessage = null
         viewModelScope.launch {

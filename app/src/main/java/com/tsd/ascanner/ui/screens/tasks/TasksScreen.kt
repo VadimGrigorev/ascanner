@@ -142,13 +142,23 @@ fun TasksScreen(
         }
     }
 
+	// Auto-refresh every 5 seconds while screen is visible
+	LaunchedEffect(Unit) {
+		while (true) {
+			kotlinx.coroutines.delay(5000)
+			if (!vm.isLoading) {
+				vm.refresh(userInitiated = false)
+			}
+		}
+	}
+
     // Always refresh tasks when screen becomes visible again
     run {
         val lifecycleOwner = LocalLifecycleOwner.current
         androidx.compose.runtime.DisposableEffect(lifecycleOwner) {
             val observer = LifecycleEventObserver { _, event ->
                 if (event == Lifecycle.Event.ON_RESUME) {
-                    vm.refresh()
+                    vm.refresh(userInitiated = false)
                 }
             }
             lifecycleOwner.lifecycle.addObserver(observer)
@@ -429,8 +439,8 @@ fun TasksScreen(
             }
         }
 
-        // Global loading overlay without dimming
-        if (vm.isLoading) {
+        // Global loading overlay without dimming (only for user-initiated loads)
+        if (vm.isLoading && vm.showLoadingIndicator) {
             Box(modifier = Modifier.fillMaxSize()) {
                 CircularProgressIndicator(
                     modifier = Modifier.align(Alignment.Center),
