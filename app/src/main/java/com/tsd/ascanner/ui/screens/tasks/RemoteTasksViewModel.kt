@@ -27,23 +27,45 @@ class RemoteTasksViewModel(
 		var showLoadingIndicator by mutableStateOf(true)
 			private set
 
+		// Internal flag to avoid overlapping background refreshes
+		private var isAutoRefreshing: Boolean = false
+
 	fun refresh(userInitiated: Boolean = true) {
-        if (isLoading) return
-		showLoadingIndicator = userInitiated
-        isLoading = true
-        errorMessage = null
-        viewModelScope.launch {
-            try {
-                val resp = docsService.fetchDocs()
-                tasks = resp.tasks
-            } catch (e: Exception) {
-                errorMessage = e.message ?: "Ошибка загрузки документов"
-            } finally {
-                isLoading = false
-				showLoadingIndicator = true
-            }
-        }
-    }
+		if (userInitiated) {
+			// Block if manual load already in progress
+			if (isLoading) return
+			showLoadingIndicator = true
+			isLoading = true
+			errorMessage = null
+			viewModelScope.launch {
+				try {
+					val resp = docsService.fetchDocs()
+					tasks = resp.tasks
+				} catch (e: Exception) {
+					errorMessage = e.message ?: "Ошибка загрузки документов"
+				} finally {
+					isLoading = false
+					showLoadingIndicator = true
+				}
+			}
+		} else {
+			// Background auto-refresh: не показываем индикатор и не блокируем клики,
+			// но не даём наслаиваться запросам и не мешаем ручной загрузке
+			if (isLoading || isAutoRefreshing) return
+			isAutoRefreshing = true
+			viewModelScope.launch {
+				try {
+					val resp = docsService.fetchDocs()
+					tasks = resp.tasks
+				} catch (e: Exception) {
+					// Можно при желании не трогать errorMessage, чтобы не спамить баннером
+					errorMessage = e.message ?: "Ошибка загрузки документов"
+				} finally {
+					isAutoRefreshing = false
+				}
+			}
+		}
+	}
 
     fun toggleTask(taskId: String) {
         expandedTaskIds = if (expandedTaskIds.contains(taskId)) {

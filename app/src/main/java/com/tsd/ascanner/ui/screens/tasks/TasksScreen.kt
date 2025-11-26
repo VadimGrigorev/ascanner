@@ -158,7 +158,9 @@ fun TasksScreen(
         androidx.compose.runtime.DisposableEffect(lifecycleOwner) {
             val observer = LifecycleEventObserver { _, event ->
                 if (event == Lifecycle.Event.ON_RESUME) {
-                    vm.refresh(userInitiated = false)
+                    // При первом показе экрана и возврате на него делаем ручной refresh
+                    // с индикатором загрузки, как и раньше.
+                    vm.refresh(userInitiated = true)
                 }
             }
             lifecycleOwner.lifecycle.addObserver(observer)
