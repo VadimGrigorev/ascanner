@@ -23,7 +23,17 @@ class ApiClient(
         .setPrettyPrinting()
         .create()
 
-    suspend fun <T> postAndParse(path: String, body: Any, responseClass: Class<T>): T =
+	companion object {
+		// Глобальный флаг: включить/выключить все HTTP-логи нашего клиента
+		private const val DEBUG_LOGS = true
+	}
+
+    suspend fun <T> postAndParse(
+		path: String,
+		body: Any,
+		responseClass: Class<T>,
+		logRequest: Boolean = false
+	): T =
         withContext(Dispatchers.IO) {
                 val url = URL(composeUrl(path))
                 val connection = (url.openConnection() as HttpURLConnection).apply {
@@ -38,11 +48,13 @@ class ApiClient(
                 }
                 try {
                     val json = gson.toJson(body)
-                    Log.d("ApiClient", buildString {
-                        append("REQUEST POST ").append(url)
-                        if (path.isNotEmpty()) append(" (path=").append(path).append(')')
-                        append('\n').append(formatForLog(json))
-                    })
+                    if (DEBUG_LOGS && logRequest) {
+                        Log.d("ApiClient", buildString {
+                            append("REQUEST POST ").append(url)
+                            if (path.isNotEmpty()) append(" (path=").append(path).append(')')
+                            append(" body=").append(formatForLog(json))
+                        })
+                    }
                     BufferedWriter(OutputStreamWriter(connection.outputStream, Charsets.UTF_8)).use { w ->
                         w.write(json)
                     }
@@ -51,10 +63,12 @@ class ApiClient(
                     val responseText = BufferedReader(InputStreamReader(stream, Charsets.UTF_8)).use { br ->
                         br.readText()
                     }
-                    Log.d("ApiClient", buildString {
-                        append("RESPONSE ").append(code).append(" from ").append(url)
-                        append('\n').append(formatForLog(responseText))
-                    })
+                    if (DEBUG_LOGS && logRequest) {
+                        Log.d("ApiClient", buildString {
+                            append("RESPONSE ").append(code).append(" from ").append(url)
+                            append(" body=").append(formatForLog(responseText))
+                        })
+                    }
                     // Global server-side error detection
                     throwIfServerError(responseText)
                     if (code !in 200..299) {
@@ -70,7 +84,11 @@ class ApiClient(
                 }
         }
 
-    suspend fun postForJsonElement(path: String, body: Any): com.google.gson.JsonElement =
+    suspend fun postForJsonElement(
+		path: String,
+		body: Any,
+		logRequest: Boolean = false
+	): com.google.gson.JsonElement =
         withContext(Dispatchers.IO) {
                 val url = URL(composeUrl(path))
                 val connection = (url.openConnection() as HttpURLConnection).apply {
@@ -85,11 +103,13 @@ class ApiClient(
                 }
                 try {
                     val json = gson.toJson(body)
-                    Log.d("ApiClient", buildString {
-                        append("REQUEST POST ").append(url)
-                        if (path.isNotEmpty()) append(" (path=").append(path).append(')')
-                        append('\n').append(formatForLog(json))
-                    })
+                    if (DEBUG_LOGS && logRequest) {
+                        Log.d("ApiClient", buildString {
+                            append("REQUEST POST ").append(url)
+                            if (path.isNotEmpty()) append(" (path=").append(path).append(')')
+                            append(" body=").append(formatForLog(json))
+                        })
+                    }
                     BufferedWriter(OutputStreamWriter(connection.outputStream, Charsets.UTF_8)).use { w ->
                         w.write(json)
                     }
@@ -98,10 +118,12 @@ class ApiClient(
                     val responseText = BufferedReader(InputStreamReader(stream, Charsets.UTF_8)).use { br ->
                         br.readText()
                     }
-                    Log.d("ApiClient", buildString {
-                        append("RESPONSE ").append(code).append(" from ").append(url)
-                        append('\n').append(formatForLog(responseText))
-                    })
+                    if (DEBUG_LOGS && logRequest) {
+                        Log.d("ApiClient", buildString {
+                            append("RESPONSE ").append(code).append(" from ").append(url)
+                            append(" body=").append(formatForLog(responseText))
+                        })
+                    }
                     // Global server-side error detection
                     throwIfServerError(responseText)
                     if (code !in 200..299) {
@@ -148,9 +170,17 @@ class ApiClient(
         return try {
             val masked = maskSensitive(raw)
             val element = gson.fromJson(masked, com.google.gson.JsonElement::class.java)
-            prettyGson.toJson(element)
+            val compact = prettyGson.toJson(element)
+                .replace("\\s+".toRegex(), " ")
+                .trim()
+            val maxLen = 600
+            if (compact.length <= maxLen) compact
+            else compact.take(maxLen) + "... (len=${compact.length})"
         } catch (_: Exception) {
-            raw
+            val singleLine = raw.replace("\\s+".toRegex(), " ").trim()
+            val maxLen = 600
+            if (singleLine.length <= maxLen) singleLine
+            else singleLine.take(maxLen) + "... (len=${singleLine.length})"
         }
     }
 

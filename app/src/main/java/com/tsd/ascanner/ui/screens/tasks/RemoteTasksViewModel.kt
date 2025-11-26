@@ -39,7 +39,7 @@ class RemoteTasksViewModel(
 			errorMessage = null
 			viewModelScope.launch {
 				try {
-					val resp = docsService.fetchDocs()
+					val resp = docsService.fetchDocs(logRequest = true)
 					tasks = resp.tasks
 				} catch (e: Exception) {
 					errorMessage = e.message ?: "Ошибка загрузки документов"
@@ -55,7 +55,7 @@ class RemoteTasksViewModel(
 			isAutoRefreshing = true
 			viewModelScope.launch {
 				try {
-					val resp = docsService.fetchDocs()
+					val resp = docsService.fetchDocs(logRequest = false)
 					tasks = resp.tasks
 				} catch (e: Exception) {
 					// Можно при желании не трогать errorMessage, чтобы не спамить баннером
@@ -86,7 +86,7 @@ class RemoteTasksViewModel(
         errorMessage = null
         viewModelScope.launch {
             try {
-                val doc = docsService.fetchDoc(orderId)
+                val doc = docsService.fetchDoc(orderId, logRequest = true)
                 docsService.currentDoc = doc
                 onSuccessOpen()
             } catch (e: Exception) {

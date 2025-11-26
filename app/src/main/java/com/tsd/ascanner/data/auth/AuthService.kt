@@ -13,13 +13,13 @@ class AuthService(
 
     suspend fun fetchUsers(): List<UserDto> {
         val req = UserListRequest()
-        val resp = apiClient.postAndParse("/users", req, UserListResponse::class.java)
+		val resp = apiClient.postAndParse("/users", req, UserListResponse::class.java, logRequest = true)
         return resp.users
     }
 
     suspend fun login(userId: String, password: String): LoginResult {
         val req = LoginRequest(user = userId, password = password)
-        val resp = apiClient.postAndParse("/login", req, LoginResponse::class.java)
+		val resp = apiClient.postAndParse("/login", req, LoginResponse::class.java, logRequest = true)
         return if (resp.messageType?.equals("login", ignoreCase = true) == true && !resp.bearer.isNullOrBlank()) {
             bearer = resp.bearer
             LoginResult.Success(resp.bearer!!)
@@ -31,7 +31,7 @@ class AuthService(
 
     suspend fun scanLogin(text: String): LoginResult {
         val req = LoginScanRequest(text = text)
-        val element = apiClient.postForJsonElement("/scanlogin", req)
+		val element = apiClient.postForJsonElement("/scanlogin", req, logRequest = true)
         val obj = element.asJsonObject
         val messageType = if (obj.has("MessageType")) obj.get("MessageType").asString else null
         if (messageType != null && messageType.equals("error", ignoreCase = true)) {
@@ -52,7 +52,7 @@ class AuthService(
         val b = bearer ?: return
         val req = LogoutRequest(bearer = b)
         // Ignore response and errors; best-effort ping
-        runCatching { apiClient.postForJsonElement("/logout", req) }
+		runCatching { apiClient.postForJsonElement("/logout", req, logRequest = false) }
     }
 
 	fun clearLocalSession() {

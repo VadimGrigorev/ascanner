@@ -12,16 +12,16 @@ class DocsService(
     @Volatile
     var currentPos: PosResponse? = null
 
-    suspend fun fetchDocs(): DocListResponse {
+    suspend fun fetchDocs(logRequest: Boolean): DocListResponse {
         val bearer = authService.bearer ?: throw IllegalStateException("Нет токена авторизации")
         val req = DocListRequest(bearer = bearer)
-        return apiClient.postAndParse("/docs", req, DocListResponse::class.java)
+        return apiClient.postAndParse("/docs", req, DocListResponse::class.java, logRequest = logRequest)
     }
 
-    suspend fun fetchDoc(formId: String): DocOneResponse {
+    suspend fun fetchDoc(formId: String, logRequest: Boolean): DocOneResponse {
         val bearer = authService.bearer ?: throw IllegalStateException("Нет токена авторизации")
         val req = DocOneRequest(bearer = bearer, formId = formId)
-        return apiClient.postAndParse("/doc", req, DocOneResponse::class.java)
+        return apiClient.postAndParse("/doc", req, DocOneResponse::class.java, logRequest = logRequest)
     }
 
     private fun extractFormIdFromScanned(scannedText: String): String? {
@@ -36,7 +36,7 @@ class DocsService(
         val formId = extractFormIdFromScanned(scannedText)
             ?: return ScanDocResult.Error("неверный формат штрихкода")
         return try {
-            val doc = fetchDoc(formId)
+            val doc = fetchDoc(formId, logRequest = true)
             currentDoc = doc
             ScanDocResult.Success(doc)
         } catch (e: Exception) {
@@ -47,7 +47,7 @@ class DocsService(
     suspend fun scanDocList(text: String): ScanDocResult {
         val bearer = authService.bearer ?: throw IllegalStateException("Нет токена авторизации")
         val req = DocScanRequest(bearer = bearer, text = text)
-        val element = apiClient.postForJsonElement("/scanlist", req)
+        val element = apiClient.postForJsonElement("/scanlist", req, logRequest = true)
         val obj = element.asJsonObject
         val messageType = if (obj.has("MessageType")) obj.get("MessageType").asString else null
         if (messageType != null && messageType.equals("error", ignoreCase = true)) {
@@ -62,7 +62,7 @@ class DocsService(
         } else {
             val selectedId = if (obj.has("SelectedId")) obj.get("SelectedId").asString else null
             if (!selectedId.isNullOrBlank()) {
-                val doc = fetchDoc(selectedId)
+                val doc = fetchDoc(selectedId, logRequest = true)
                 currentDoc = doc
                 ScanDocResult.Success(doc)
             } else {
@@ -74,7 +74,7 @@ class DocsService(
     suspend fun scanMark(formId: String, text: String): ScanDocResult {
         val bearer = authService.bearer ?: throw IllegalStateException("Нет токена авторизации")
         val req = DocScan2Request(bearer = bearer, formId = formId, text = text)
-        val element = apiClient.postForJsonElement("/scan", req)
+        val element = apiClient.postForJsonElement("/scan", req, logRequest = true)
         val obj = element.asJsonObject
         val messageType = if (obj.has("MessageType")) obj.get("MessageType").asString else null
         if (messageType != null && messageType.equals("error", ignoreCase = true)) {
@@ -86,16 +86,16 @@ class DocsService(
         return ScanDocResult.Success(doc)
     }
 
-    suspend fun fetchPos(formId: String): PosResponse {
+    suspend fun fetchPos(formId: String, logRequest: Boolean): PosResponse {
         val bearer = authService.bearer ?: throw IllegalStateException("Нет токена авторизации")
         val req = PosRequest(bearer = bearer, formId = formId)
-        return apiClient.postAndParse("/pos", req, PosResponse::class.java)
+        return apiClient.postAndParse("/pos", req, PosResponse::class.java, logRequest = logRequest)
     }
 
     suspend fun scanPosMark(formId: String, text: String): ScanPosResult {
         val bearer = authService.bearer ?: throw IllegalStateException("Нет токена авторизации")
         val req = DocScan2Request(bearer = bearer, form = "pos", formId = formId, text = text)
-        val element = apiClient.postForJsonElement("/scanone", req)
+        val element = apiClient.postForJsonElement("/scanone", req, logRequest = true)
         val obj = element.asJsonObject
         val messageType = if (obj.has("MessageType")) obj.get("MessageType").asString else null
         if (messageType != null && messageType.equals("error", ignoreCase = true)) {
@@ -110,7 +110,7 @@ class DocsService(
     suspend fun deletePosAll(formId: String): ScanPosResult {
         val bearer = authService.bearer ?: throw IllegalStateException("Нет токена авторизации")
         val req = PosDeleteRequest(bearer = bearer, formId = formId, deleteId = "")
-        val element = apiClient.postForJsonElement("/posdelete", req)
+        val element = apiClient.postForJsonElement("/posdelete", req, logRequest = true)
         val obj = element.asJsonObject
         val messageType = if (obj.has("MessageType")) obj.get("MessageType").asString else null
         if (messageType != null && messageType.equals("error", ignoreCase = true)) {
@@ -125,7 +125,7 @@ class DocsService(
     suspend fun deletePosItem(formId: String, deleteId: String): ScanPosResult {
         val bearer = authService.bearer ?: throw IllegalStateException("Нет токена авторизации")
         val req = PosDeleteRequest(bearer = bearer, formId = formId, deleteId = deleteId)
-        val element = apiClient.postForJsonElement("/posdelete", req)
+        val element = apiClient.postForJsonElement("/posdelete", req, logRequest = true)
         val obj = element.asJsonObject
         val messageType = if (obj.has("MessageType")) obj.get("MessageType").asString else null
         if (messageType != null && messageType.equals("error", ignoreCase = true)) {

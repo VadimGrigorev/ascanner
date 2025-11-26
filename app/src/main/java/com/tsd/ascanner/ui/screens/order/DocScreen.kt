@@ -91,11 +91,11 @@ fun DocScreen(
         scanError.value?.let { ErrorBus.emit(it) }
     }
 
-    // Initial load: fetch doc for provided formId
+    // Initial load: fetch doc for provided formId (логируем как ручной запрос)
     androidx.compose.runtime.LaunchedEffect(formId) {
         globalLoading.value = true
         try {
-            val fresh = docsService.fetchDoc(formId)
+            val fresh = docsService.fetchDoc(formId, logRequest = true)
             docsService.currentDoc = fresh
             docState.value = fresh
         } catch (_: Exception) {
@@ -150,7 +150,7 @@ fun DocScreen(
                         scope.launch {
                             try {
                                 globalLoading.value = true
-                                val fresh = docsService.fetchDoc(formId)
+                                val fresh = docsService.fetchDoc(formId, logRequest = true)
                                 docsService.currentDoc = fresh
                                 docState.value = fresh
                             } catch (_: Exception) {
@@ -166,13 +166,13 @@ fun DocScreen(
         }
     }
 
-	// Auto-refresh every 5 seconds while on this screen
+	// Auto-refresh every 5 seconds while on this screen (без логов)
 	LaunchedEffect(formId) {
 		while (true) {
 			kotlinx.coroutines.delay(5000)
 			if (!globalLoading.value && !isRequesting.value) {
 				try {
-					val fresh = docsService.fetchDoc(formId)
+					val fresh = docsService.fetchDoc(formId, logRequest = false)
 					docsService.currentDoc = fresh
 					docState.value = fresh
 				} catch (_: Exception) {
@@ -245,7 +245,7 @@ fun DocScreen(
                                 try {
                                     loadingPosId = formId
                                     errorMessage.value = null
-                                    val pos = docsService.fetchPos(formId)
+                                    val pos = docsService.fetchPos(formId, logRequest = true)
                                     docsService.currentPos = pos
                                     onOpenPosition()
                                 } catch (e: Exception) {
@@ -388,7 +388,7 @@ fun DocScreen(
                         scope.launch {
                             try {
                                 globalLoading.value = true
-                                val fresh = docsService.fetchDoc(formId)
+                                val fresh = docsService.fetchDoc(formId, logRequest = true)
                                 docsService.currentDoc = fresh
                                 docState.value = fresh
                             } catch (_: Exception) {

@@ -97,7 +97,7 @@ fun PosScreen(
 							scope.launch {
 								try {
 									posLoading.value = true
-									val fresh = app.docsService.fetchPos(currentFormId)
+									val fresh = app.docsService.fetchPos(currentFormId, logRequest = true)
 									app.docsService.currentPos = fresh
 									posState.value = fresh
 								} catch (_: Exception) {
@@ -119,7 +119,7 @@ fun PosScreen(
         scanError.value?.let { ErrorBus.emit(it) }
     }
 
-	// Auto-refresh every 5 seconds while on this screen
+	// Auto-refresh every 5 seconds while on this screen (без логов)
 	LaunchedEffect(Unit) {
 		while (true) {
 			kotlinx.coroutines.delay(5000)
@@ -127,7 +127,7 @@ fun PosScreen(
 				val currentFormId = posState.value?.formId ?: app.docsService.currentPos?.formId
 				if (!currentFormId.isNullOrBlank()) {
 					try {
-						val fresh = app.docsService.fetchPos(currentFormId)
+						val fresh = app.docsService.fetchPos(currentFormId, logRequest = false)
 						app.docsService.currentPos = fresh
 						posState.value = fresh
 					} catch (_: Exception) {
@@ -192,7 +192,7 @@ fun PosScreen(
                                 scope.launch {
                                     try {
                                         posLoading.value = true
-                                        val fresh = app.docsService.fetchPos(currentFormId)
+                                        val fresh = app.docsService.fetchPos(currentFormId, logRequest = true)
                                         app.docsService.currentPos = fresh
                                         posState.value = fresh
                                     } catch (e: Exception) {
