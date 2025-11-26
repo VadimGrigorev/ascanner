@@ -10,7 +10,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -31,6 +30,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.ui.unit.dp
 import androidx.compose.material.icons.outlined.Refresh
 import androidx.lifecycle.ViewModel
@@ -38,14 +41,12 @@ import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.tsd.ascanner.data.auth.AuthService
 import com.tsd.ascanner.data.auth.UserDto
-import com.tsd.ascanner.data.net.ApiClient
 import com.tsd.ascanner.data.net.ServerSettings
 import com.tsd.ascanner.ui.theme.AppTheme
 import kotlinx.coroutines.launch
 import com.tsd.ascanner.AScannerApp
 import com.tsd.ascanner.utils.ErrorBus
 import com.tsd.ascanner.utils.UserMessageMapper
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.draw.alpha
@@ -154,17 +155,64 @@ fun LoginScreen(
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-		OutlinedTextField(
-			value = serverUrl,
-			onValueChange = { value ->
-				serverUrl = value
-				ServerSettings.setBaseUrl(ctx, value)
-			},
-			modifier = Modifier
-				.fillMaxWidth(),
-			label = { Text(text = "Адрес сервера") },
-			singleLine = true
-		)
+		// Server address: dropdown with presets + optional manual input
+		var serverDropdownExpanded by remember { mutableStateOf(false) }
+		val serverPresets = listOf("forpost21.ru:13400", "192.168.1.44:80", "Ввести вручную")
+		fun stripScheme(url: String): String {
+			return url.removePrefix("http://").removePrefix("https://")
+		}
+		var serverPresetIndex by remember {
+			val noScheme = stripScheme(serverUrl)
+			val idx = serverPresets.indexOfFirst { it == noScheme }
+			mutableStateOf(if (idx >= 0) idx else 2)
+		}
+		ExposedDropdownMenuBox(
+			expanded = serverDropdownExpanded,
+			onExpandedChange = { serverDropdownExpanded = !serverDropdownExpanded },
+		) {
+			OutlinedTextField(
+				modifier = Modifier
+					.menuAnchor()
+					.fillMaxWidth(),
+				value = if (serverPresetIndex in 0..1) serverPresets[serverPresetIndex] else "Ввести вручную",
+				onValueChange = {},
+				readOnly = true,
+				label = { Text(text = "Адрес сервера") },
+				trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = serverDropdownExpanded) },
+				colors = TextFieldDefaults.colors()
+			)
+			ExposedDropdownMenu(
+				expanded = serverDropdownExpanded,
+				onDismissRequest = { serverDropdownExpanded = false }
+			) {
+				serverPresets.forEachIndexed { i, text ->
+					DropdownMenuItem(
+						text = { Text(text) },
+						onClick = {
+							serverPresetIndex = i
+							serverDropdownExpanded = false
+							if (i in 0..1) {
+								serverUrl = serverPresets[i]
+								ServerSettings.setBaseUrl(ctx, serverUrl)
+							}
+						}
+					)
+				}
+			}
+		}
+		if (serverPresetIndex == 2) {
+			Spacer(Modifier.height(8.dp))
+			OutlinedTextField(
+				value = serverUrl,
+				onValueChange = { value ->
+					serverUrl = value
+					ServerSettings.setBaseUrl(ctx, value)
+				},
+				modifier = Modifier.fillMaxWidth(),
+				label = { Text(text = "Ввести вручную") },
+				singleLine = true
+			)
+		}
 		Spacer(Modifier.height(12.dp))
 
         // Hidden input to capture hardware scanner text at login screen
@@ -185,6 +233,8 @@ fun LoginScreen(
                     if (code.length < 4) return
                     scope.launch {
                         try {
+                            val normalized = if (serverUrl.startsWith("http://") || serverUrl.startsWith("https://")) serverUrl else "http://$serverUrl"
+                            ServerSettings.setBaseUrl(ctx, normalized)
                             when (val res = app.authService.scanLogin(code)) {
                                 is com.tsd.ascanner.data.auth.LoginResult.Success -> {
                                     onLoggedIn()
@@ -286,13 +336,29 @@ fun LoginScreen(
             onValueChange = vm::onPasswordChange,
             modifier = Modifier.fillMaxWidth(),
             label = { Text(text = androidx.compose.ui.res.stringResource(id = com.tsd.ascanner.R.string.password_label)) },
-            visualTransformation = PasswordVisualTransformation()
+			visualTransformation = PasswordVisualTransformation(),
+			keyboardOptions = KeyboardOptions.Default.copy(
+				keyboardType = KeyboardType.Password,
+				imeAction = ImeAction.Done
+			),
+			keyboardActions = KeyboardActions(
+				onDone = {
+					val normalized = if (serverUrl.startsWith("http://") || serverUrl.startsWith("https://")) serverUrl else "http://$serverUrl"
+					ServerSettings.setBaseUrl(ctx, normalized)
+					vm.login()
+				}
+			),
+			singleLine = true
         )
 
         Spacer(Modifier.height(16.dp))
 
         Button(
-            onClick = { vm.login() },
+            onClick = {
+                val normalized = if (serverUrl.startsWith("http://") || serverUrl.startsWith("https://")) serverUrl else "http://$serverUrl"
+                ServerSettings.setBaseUrl(ctx, normalized)
+                vm.login()
+            },
             modifier = Modifier.fillMaxWidth().height(56.dp),
             enabled = !vm.loading && vm.selectedUser != null
         ) {
@@ -337,7 +403,7 @@ fun LoginScreen(
 			.padding(16.dp)
 	) {
 		Text(
-			text = "0.98 тестовая версия",
+			text = "1.0 версия",
 			modifier = Modifier.align(Alignment.BottomStart),
 			color = colors.textSecondary
 		)

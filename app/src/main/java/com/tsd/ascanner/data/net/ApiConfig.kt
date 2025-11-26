@@ -5,7 +5,14 @@ import com.tsd.ascanner.AScannerApp
 
 object ApiConfig {
     val baseUrl: String
-		get() = ServerSettings.getBaseUrl(AScannerApp.instance)
+		get() {
+			val raw = ServerSettings.getBaseUrl(AScannerApp.instance).trim()
+			return if (raw.startsWith("http://", ignoreCase = true) || raw.startsWith("https://", ignoreCase = true)) {
+				raw
+			} else {
+				"http://$raw"
+			}
+		}
 }
 
 
