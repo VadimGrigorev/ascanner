@@ -155,64 +155,16 @@ fun LoginScreen(
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-		// Server address: dropdown with presets + optional manual input
-		var serverDropdownExpanded by remember { mutableStateOf(false) }
-		val serverPresets = listOf("forpost21.ru:13400", "192.168.1.44:80", "Ввести вручную")
-		fun stripScheme(url: String): String {
-			return url.removePrefix("http://").removePrefix("https://")
-		}
-		var serverPresetIndex by remember {
-			val noScheme = stripScheme(serverUrl)
-			val idx = serverPresets.indexOfFirst { it == noScheme }
-			mutableStateOf(if (idx >= 0) idx else 2)
-		}
-		ExposedDropdownMenuBox(
-			expanded = serverDropdownExpanded,
-			onExpandedChange = { serverDropdownExpanded = !serverDropdownExpanded },
-		) {
-			OutlinedTextField(
-				modifier = Modifier
-					.menuAnchor()
-					.fillMaxWidth(),
-				value = if (serverPresetIndex in 0..1) serverPresets[serverPresetIndex] else "Ввести вручную",
-				onValueChange = {},
-				readOnly = true,
-				label = { Text(text = "Адрес сервера") },
-				trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = serverDropdownExpanded) },
-				colors = TextFieldDefaults.colors()
-			)
-			ExposedDropdownMenu(
-				expanded = serverDropdownExpanded,
-				onDismissRequest = { serverDropdownExpanded = false }
-			) {
-				serverPresets.forEachIndexed { i, text ->
-					DropdownMenuItem(
-						text = { Text(text) },
-						onClick = {
-							serverPresetIndex = i
-							serverDropdownExpanded = false
-							if (i in 0..1) {
-								serverUrl = serverPresets[i]
-								ServerSettings.setBaseUrl(ctx, serverUrl)
-							}
-						}
-					)
-				}
-			}
-		}
-		if (serverPresetIndex == 2) {
-			Spacer(Modifier.height(8.dp))
-			OutlinedTextField(
-				value = serverUrl,
-				onValueChange = { value ->
-					serverUrl = value
-					ServerSettings.setBaseUrl(ctx, value)
-				},
-				modifier = Modifier.fillMaxWidth(),
-				label = { Text(text = "Ввести вручную") },
-				singleLine = true
-			)
-		}
+		OutlinedTextField(
+			value = serverUrl,
+			onValueChange = { value ->
+				serverUrl = value
+				ServerSettings.setBaseUrl(ctx, value)
+			},
+			modifier = Modifier.fillMaxWidth(),
+			label = { Text(text = "Адрес сервера/номер компьютера") },
+			singleLine = true
+		)
 		Spacer(Modifier.height(12.dp))
 
         // Hidden input to capture hardware scanner text at login screen
@@ -233,8 +185,6 @@ fun LoginScreen(
                     if (code.length < 4) return
                     scope.launch {
                         try {
-                            val normalized = if (serverUrl.startsWith("http://") || serverUrl.startsWith("https://")) serverUrl else "http://$serverUrl"
-                            ServerSettings.setBaseUrl(ctx, normalized)
                             when (val res = app.authService.scanLogin(code)) {
                                 is com.tsd.ascanner.data.auth.LoginResult.Success -> {
                                     onLoggedIn()
@@ -343,8 +293,6 @@ fun LoginScreen(
 			),
 			keyboardActions = KeyboardActions(
 				onDone = {
-					val normalized = if (serverUrl.startsWith("http://") || serverUrl.startsWith("https://")) serverUrl else "http://$serverUrl"
-					ServerSettings.setBaseUrl(ctx, normalized)
 					vm.login()
 				}
 			),
@@ -354,11 +302,7 @@ fun LoginScreen(
         Spacer(Modifier.height(16.dp))
 
         Button(
-            onClick = {
-                val normalized = if (serverUrl.startsWith("http://") || serverUrl.startsWith("https://")) serverUrl else "http://$serverUrl"
-                ServerSettings.setBaseUrl(ctx, normalized)
-                vm.login()
-            },
+            onClick = { vm.login() },
             modifier = Modifier.fillMaxWidth().height(56.dp),
             enabled = !vm.loading && vm.selectedUser != null
         ) {
