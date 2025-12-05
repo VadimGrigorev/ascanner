@@ -29,6 +29,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.outlined.Refresh
+import androidx.compose.material.icons.outlined.PhotoCamera
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -88,6 +89,34 @@ fun TasksScreen(
     var isRequesting by remember { mutableStateOf(false) }
     var loadingOrderId by remember { mutableStateOf<String?>(null) }
 	var searchFocused by remember { mutableStateOf(false) }
+    var showCamera by remember { mutableStateOf(false) }
+
+    fun commitScan(code: String) {
+        if (code.length < 4) return
+        lastScan = code
+        scanError = null
+        scope.launch {
+            try {
+                isRequesting = true
+                when (val res = app.docsService.scanDocList(code)) {
+                    is com.tsd.ascanner.data.docs.ScanDocResult.Success -> {
+                        isScanning = false
+                        val id = res.doc.formId ?: app.docsService.currentDoc?.formId ?: code
+                        onOpenDoc(id)
+                    }
+                    is com.tsd.ascanner.data.docs.ScanDocResult.Error -> {
+                        scanError = res.message
+                        isScanning = true
+                    }
+                }
+            } catch (e: Exception) {
+                scanError = e.message ?: "Ошибка запроса"
+                isScanning = true
+            } finally {
+                isRequesting = false
+            }
+        }
+    }
 
     // Auto-hide scanned text after 3s
     LaunchedEffect(lastScan) {
@@ -183,32 +212,6 @@ fun TasksScreen(
                     imeOptions = android.view.inputmethod.EditorInfo.IME_FLAG_NO_EXTRACT_UI or android.view.inputmethod.EditorInfo.IME_FLAG_NO_FULLSCREEN
                 }
                 var debounceJob: kotlinx.coroutines.Job? = null
-                fun commitIfReady(code: String) {
-                    if (code.length < 4) return
-                    lastScan = code
-                    scanError = null
-                    scope.launch {
-                        try {
-                            isRequesting = true
-                            when (val res = app.docsService.scanDocList(code)) {
-                                is com.tsd.ascanner.data.docs.ScanDocResult.Success -> {
-                                    isScanning = false
-                                    val id = res.doc.formId ?: app.docsService.currentDoc?.formId ?: code
-                                    onOpenDoc(id)
-                                }
-                                is com.tsd.ascanner.data.docs.ScanDocResult.Error -> {
-                                    scanError = res.message
-                                    isScanning = true
-                                }
-                            }
-                        } catch (e: Exception) {
-                            scanError = e.message ?: "Ошибка запроса"
-                            isScanning = true
-                        } finally {
-                            isRequesting = false
-                        }
-                    }
-                }
                 val watcher = object : android.text.TextWatcher {
                     override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
                     override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
@@ -220,7 +223,7 @@ fun TasksScreen(
                         }
                         if (idx >= 0) {
                             val code = text.substring(0, idx).trim()
-                            if (code.isNotEmpty()) commitIfReady(code)
+                            if (code.isNotEmpty()) commitScan(code)
                             editText.setText("")
                         } else {
                             // On first chars, show overlay for UX
@@ -230,7 +233,7 @@ fun TasksScreen(
                                 kotlinx.coroutines.delay(120)
                                 val code = editText.text.toString().trim()
                                 if (code.isNotEmpty()) {
-                                    commitIfReady(code)
+                                    commitScan(code)
                                     editText.setText("")
                                 }
                             }
@@ -243,7 +246,7 @@ fun TasksScreen(
                         (keyCode == android.view.KeyEvent.KEYCODE_ENTER || keyCode == android.view.KeyEvent.KEYCODE_TAB)
                     ) {
                         val code = editText.text.toString().trim()
-                        if (code.isNotEmpty()) commitIfReady(code)
+                        if (code.isNotEmpty()) commitScan(code)
                         editText.setText("")
                         true
                     } else false
@@ -465,7 +468,21 @@ fun TasksScreen(
             ) {
                 Icon(imageVector = Icons.Outlined.Refresh, contentDescription = "Обновить")
             }
+            FloatingActionButton(
+                onClick = { showCamera = true },
+                containerColor = colors.secondary,
+                contentColor = colors.textPrimary
+            ) {
+                Icon(imageVector = Icons.Outlined.PhotoCamera, contentDescription = "Сканировать камерой")
+            }
         }
+
+        // Camera overlay
+        com.tsd.ascanner.ui.components.CameraScannerOverlay(
+            visible = showCamera,
+            onResult = { code -> commitScan(code) },
+            onClose = { showCamera = false }
+        )
     }
 
     val activity = context as? ComponentActivity

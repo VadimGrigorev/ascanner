@@ -50,6 +50,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.Refresh
+import androidx.compose.material.icons.outlined.PhotoCamera
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
@@ -73,11 +74,39 @@ fun PosScreen(
     val showDeleteAll = remember { mutableStateOf(false) }
     val pendingDeleteItemId = remember { mutableStateOf<String?>(null) }
     val posLoading = remember { mutableStateOf(false) }
+    val showCamera = remember { mutableStateOf(false) }
     LaunchedEffect(lastScan.value) {
         val hasText = !lastScan.value.isNullOrBlank()
         if (hasText) {
             kotlinx.coroutines.delay(3000)
             lastScan.value = null
+        }
+    }
+
+    fun handleScan(code: String) {
+        val currentFormId = posState.value?.formId ?: app.docsService.currentPos?.formId
+        if (code.length < 4 || currentFormId.isNullOrBlank()) return
+        lastScan.value = code
+        scanError.value = null
+        scope.launch {
+            try {
+                isRequesting.value = true
+                when (val res = app.docsService.scanPosMark(currentFormId, code)) {
+                    is com.tsd.ascanner.data.docs.ScanPosResult.Success -> {
+                        posState.value = app.docsService.currentPos
+                        isScanning.value = false
+                    }
+                    is com.tsd.ascanner.data.docs.ScanPosResult.Error -> {
+                        scanError.value = res.message
+                        isScanning.value = true
+                    }
+                }
+            } catch (e: Exception) {
+                scanError.value = e.message ?: "Ошибка запроса"
+                isScanning.value = true
+            } finally {
+                isRequesting.value = false
+            }
         }
     }
 
@@ -216,6 +245,20 @@ fun PosScreen(
                         }
                         Spacer(modifier = Modifier.width(12.dp))
                         Button(
+                            onClick = { showCamera.value = true },
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = colors.secondary,
+                                contentColor = colors.textPrimary
+                            )
+                        ) {
+                            androidx.compose.material3.Icon(
+                                imageVector = Icons.Outlined.PhotoCamera,
+                                contentDescription = "Камера"
+                            )
+                            Text(text = "Камера", modifier = Modifier.padding(start = 8.dp))
+                        }
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Button(
                             onClick = { showDeleteAll.value = true },
                             colors = ButtonDefaults.buttonColors(
                                 containerColor = colors.secondary,
@@ -315,32 +358,6 @@ fun PosScreen(
                         imeOptions = android.view.inputmethod.EditorInfo.IME_FLAG_NO_EXTRACT_UI or android.view.inputmethod.EditorInfo.IME_FLAG_NO_FULLSCREEN
                     }
                     var debounceJob: kotlinx.coroutines.Job? = null
-                    fun handle(code: String) {
-                        val currentFormId = posState.value?.formId ?: app.docsService.currentPos?.formId
-                        if (code.length < 4 || currentFormId.isNullOrBlank()) return
-                        lastScan.value = code
-                        scanError.value = null
-                        scope.launch {
-                            try {
-                                isRequesting.value = true
-                                when (val res = app.docsService.scanPosMark(currentFormId, code)) {
-                                    is com.tsd.ascanner.data.docs.ScanPosResult.Success -> {
-                                        posState.value = app.docsService.currentPos
-                                        isScanning.value = false
-                                    }
-                                    is com.tsd.ascanner.data.docs.ScanPosResult.Error -> {
-                                        scanError.value = res.message
-                                        isScanning.value = true
-                                    }
-                                }
-                            } catch (e: Exception) {
-                                scanError.value = e.message ?: "Ошибка запроса"
-                                isScanning.value = true
-                            } finally {
-                                isRequesting.value = false
-                            }
-                        }
-                    }
                     val watcher = object : android.text.TextWatcher {
                         override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
                         override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
@@ -352,7 +369,7 @@ fun PosScreen(
                             }
                             if (idx >= 0) {
                                 val code = text.substring(0, idx).trim()
-                                if (code.isNotEmpty()) handle(code)
+                                if (code.isNotEmpty()) handleScan(code)
                                 editText.setText("")
                             } else {
                                 if (!isScanning.value && text.length >= 1) isScanning.value = true
@@ -361,7 +378,7 @@ fun PosScreen(
                                     kotlinx.coroutines.delay(120)
                                     val code = editText.text.toString().trim()
                                     if (code.isNotEmpty()) {
-                                        handle(code)
+                                        handleScan(code)
                                         editText.setText("")
                                     }
                                 }
@@ -374,7 +391,7 @@ fun PosScreen(
                             (keyCode == android.view.KeyEvent.KEYCODE_ENTER || keyCode == android.view.KeyEvent.KEYCODE_TAB)
                         ) {
                             val code = editText.text.toString().trim()
-                            if (code.isNotEmpty()) handle(code)
+                            if (code.isNotEmpty()) handleScan(code)
                             editText.setText("")
                             true
                         } else false
@@ -399,6 +416,12 @@ fun PosScreen(
                 )
             }
         }
+
+        com.tsd.ascanner.ui.components.CameraScannerOverlay(
+            visible = showCamera.value,
+            onResult = { code -> handleScan(code) },
+            onClose = { showCamera.value = false }
+        )
 
         // Confirm: delete all
         if (showDeleteAll.value) {

@@ -20,6 +20,7 @@ import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Refresh
+import androidx.compose.material.icons.outlined.PhotoCamera
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
@@ -73,6 +74,34 @@ fun DocScreen(
     val globalLoading = remember { mutableStateOf(false) }
     val isRequesting = remember { mutableStateOf(false) }
     var loadingPosId by remember { mutableStateOf<String?>(null) }
+    var showCamera by remember { mutableStateOf(false) }
+
+    fun handleScan(code: String) {
+        val currentFormId = docState.value?.formId ?: docsService.currentDoc?.formId
+        if (code.length < 4 || currentFormId.isNullOrBlank()) return
+        lastScan.value = code
+        scanError.value = null
+        scope.launch {
+            try {
+                isRequesting.value = true
+                when (val res = docsService.scanMark(currentFormId, code)) {
+                    is com.tsd.ascanner.data.docs.ScanDocResult.Success -> {
+                        docState.value = docsService.currentDoc
+                        isScanning.value = false
+                    }
+                    is com.tsd.ascanner.data.docs.ScanDocResult.Error -> {
+                        scanError.value = res.message
+                        isScanning.value = true
+                    }
+                }
+            } catch (e: Exception) {
+                scanError.value = e.message ?: "Ошибка запроса"
+                isScanning.value = true
+            } finally {
+                isRequesting.value = false
+            }
+        }
+    }
 
     // Auto-hide scanned text after 3s
     LaunchedEffect(lastScan.value) {
@@ -300,32 +329,6 @@ fun DocScreen(
                         imeOptions = android.view.inputmethod.EditorInfo.IME_FLAG_NO_EXTRACT_UI or android.view.inputmethod.EditorInfo.IME_FLAG_NO_FULLSCREEN
                     }
                     var debounceJob: kotlinx.coroutines.Job? = null
-                    fun handle(code: String) {
-                        val currentFormId = docState.value?.formId ?: docsService.currentDoc?.formId
-                        if (code.length < 4 || currentFormId.isNullOrBlank()) return
-                        lastScan.value = code
-                        scanError.value = null
-                        scope.launch {
-                            try {
-                                isRequesting.value = true
-                                when (val res = docsService.scanMark(currentFormId, code)) {
-                                    is com.tsd.ascanner.data.docs.ScanDocResult.Success -> {
-                                        docState.value = docsService.currentDoc
-                                        isScanning.value = false
-                                    }
-                                    is com.tsd.ascanner.data.docs.ScanDocResult.Error -> {
-                                        scanError.value = res.message
-                                        isScanning.value = true
-                                    }
-                                }
-                            } catch (e: Exception) {
-                                scanError.value = e.message ?: "Ошибка запроса"
-                                isScanning.value = true
-                            } finally {
-                                isRequesting.value = false
-                            }
-                        }
-                    }
                     val watcher = object : android.text.TextWatcher {
                         override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
                         override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
@@ -337,7 +340,7 @@ fun DocScreen(
                             }
                             if (idx >= 0) {
                                 val code = text.substring(0, idx).trim()
-                                if (code.isNotEmpty()) handle(code)
+                                if (code.isNotEmpty()) handleScan(code)
                                 editText.setText("")
                             } else {
                                 if (!isScanning.value && text.length >= 1) isScanning.value = true
@@ -346,7 +349,7 @@ fun DocScreen(
                                     kotlinx.coroutines.delay(120)
                                     val code = editText.text.toString().trim()
                                     if (code.isNotEmpty()) {
-                                        handle(code)
+                                        handleScan(code)
                                         editText.setText("")
                                     }
                                 }
@@ -359,7 +362,7 @@ fun DocScreen(
                             (keyCode == android.view.KeyEvent.KEYCODE_ENTER || keyCode == android.view.KeyEvent.KEYCODE_TAB)
                         ) {
                             val code = editText.text.toString().trim()
-                            if (code.isNotEmpty()) handle(code)
+                            if (code.isNotEmpty()) handleScan(code)
                             editText.setText("")
                             true
                         } else false
@@ -378,13 +381,13 @@ fun DocScreen(
             modifier = Modifier
                 .align(Alignment.BottomEnd)
                 .padding(16.dp),
-            horizontalAlignment = Alignment.End
+            horizontalAlignment = Alignment.End,
+            verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(12.dp)
         ) {
             FloatingActionButton(
                 onClick = {
                     val formId = doc?.formId
                     if (!formId.isNullOrBlank()) {
-                        // Refresh current doc
                         scope.launch {
                             try {
                                 globalLoading.value = true
@@ -401,7 +404,20 @@ fun DocScreen(
             ) {
                 Icon(imageVector = Icons.Outlined.Refresh, contentDescription = "Обновить")
             }
+            FloatingActionButton(
+                onClick = { showCamera = true },
+                containerColor = colors.secondary,
+                contentColor = colors.textPrimary
+            ) {
+                Icon(imageVector = Icons.Outlined.PhotoCamera, contentDescription = "Сканировать камерой")
+            }
         }
+
+        com.tsd.ascanner.ui.components.CameraScannerOverlay(
+            visible = showCamera,
+            onResult = { code -> handleScan(code) },
+            onClose = { showCamera = false }
+        )
 
         if (globalLoading.value || loadingPosId != null) {
             Box(modifier = Modifier.fillMaxSize()) {

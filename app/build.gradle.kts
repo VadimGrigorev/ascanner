@@ -81,7 +81,13 @@ dependencies {
     // JSON
     implementation("com.google.code.gson:gson:2.10.1")
 
-    // CameraX and ML Kit removed (hardware scanner only)
+    // CameraX + ML Kit (for camera barcode scanning)
+    val cameraxVersion = "1.3.4"
+    implementation("androidx.camera:camera-core:$cameraxVersion")
+    implementation("androidx.camera:camera-camera2:$cameraxVersion")
+    implementation("androidx.camera:camera-lifecycle:$cameraxVersion")
+    implementation("androidx.camera:camera-view:$cameraxVersion")
+    implementation("com.google.mlkit:barcode-scanning:17.2.0")
 
     // Activity and Fragment
     implementation("androidx.core:core-ktx:1.13.1")
