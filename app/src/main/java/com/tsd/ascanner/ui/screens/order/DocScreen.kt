@@ -258,6 +258,7 @@ fun DocScreen(
 				val bg = when (st) {
 					"closed" -> colors.statusDoneBg
 					"pending" -> colors.statusPendingBg
+					"warning" -> colors.statusWarningBg
 					"error" -> colors.statusErrorBg
 					else -> colors.statusTodoBg
 				}

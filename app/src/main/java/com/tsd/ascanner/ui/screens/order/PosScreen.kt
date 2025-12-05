@@ -269,6 +269,7 @@ fun PosScreen(
 			val defaultBg = when (stDefault) {
 				"closed" -> colors.statusDoneBg
 				"pending" -> colors.statusPendingBg
+				"warning" -> colors.statusWarningBg
 				"error" -> colors.statusErrorBg
 				else -> colors.statusTodoBg
 			}
@@ -280,6 +281,7 @@ fun PosScreen(
 				val itemBg = when (stItem) {
 					"closed" -> colors.statusDoneBg
 					"pending" -> colors.statusPendingBg
+					"warning" -> colors.statusWarningBg
 					"error" -> colors.statusErrorBg
 					else -> defaultBg
 				}

@@ -18,6 +18,7 @@ data class AppColors(
 	val statusDoneBg: Color,   // фон карточек завершённых задач/заказов
 	val statusTodoBg: Color,   // фон карточек незавершённых задач/заказов (open)
 	val statusPendingBg: Color, // фон карточек в ожидании (pending)
+	val statusWarningBg: Color, // фон карточек с предупреждением (warning)
 	val statusErrorBg: Color   // фон карточек с ошибкой (error)
 )
 
@@ -35,6 +36,7 @@ val LocalAppColors = staticCompositionLocalOf {
 		statusDoneBg = Color(0xFFE7F7EC),
 		statusTodoBg = Color(30, 136, 229),
 		statusPendingBg = Color(0xFFCDD1C4),
+		statusWarningBg = Color(0xFFFFF59D),
 		statusErrorBg = Color(0xFFFF595E)
     )
 }
@@ -53,6 +55,7 @@ object AppPalettes {
 		statusDoneBg = Color(52, 199, 89),
 		statusTodoBg = Color(30, 136, 229),
 		statusPendingBg = Color(0xFFCDD1C4),
+		statusWarningBg = Color(0xFFFFF59D),
 		statusErrorBg = Color(0xFFFF595E)
     )
 }

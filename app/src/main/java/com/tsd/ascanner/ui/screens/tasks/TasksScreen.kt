@@ -341,11 +341,13 @@ fun TasksScreen(
                 val totalOrders = original?.orders?.size ?: 0
                 val statuses = original?.orders?.map { (it.status ?: "").lowercase() } ?: emptyList()
                 val hasError = statuses.any { it == "error" }
+                val hasWarning = statuses.any { it == "warning" }
                 val allClosed = totalOrders > 0 && statuses.all { it == "closed" }
                 val hasPending = statuses.any { it == "pending" }
                 val closedCount = statuses.count { it == "closed" }
                 val headerBg = when {
                     hasError -> colors.statusErrorBg
+                    hasWarning -> colors.statusWarningBg
                     allClosed -> colors.statusDoneBg
                     hasPending -> colors.statusPendingBg
                     else -> colors.statusTodoBg
@@ -398,6 +400,7 @@ fun TasksScreen(
                         val orderBg = when (st) {
                             "closed" -> colors.statusDoneBg
                             "pending" -> colors.statusPendingBg
+                            "warning" -> colors.statusWarningBg
                             "error" -> colors.statusErrorBg
                             else -> colors.statusTodoBg
                         }
