@@ -64,6 +64,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
+import com.tsd.ascanner.utils.DebugFlags
 
 class TasksViewModel(private val service: DocsService) : ViewModel()
 
@@ -468,21 +469,25 @@ fun TasksScreen(
             ) {
                 Icon(imageVector = Icons.Outlined.Refresh, contentDescription = "Обновить")
             }
-            FloatingActionButton(
-                onClick = { showCamera = true },
-                containerColor = colors.secondary,
-                contentColor = colors.textPrimary
-            ) {
-                Icon(imageVector = Icons.Outlined.PhotoCamera, contentDescription = "Сканировать камерой")
+            if (DebugFlags.CAMERA_SCAN_ENABLED) {
+                FloatingActionButton(
+                    onClick = { showCamera = true },
+                    containerColor = colors.secondary,
+                    contentColor = colors.textPrimary
+                ) {
+                    Icon(imageVector = Icons.Outlined.PhotoCamera, contentDescription = "Сканировать камерой")
+                }
             }
         }
 
         // Camera overlay
-        com.tsd.ascanner.ui.components.CameraScannerOverlay(
-            visible = showCamera,
-            onResult = { code -> commitScan(code) },
-            onClose = { showCamera = false }
-        )
+        if (DebugFlags.CAMERA_SCAN_ENABLED) {
+            com.tsd.ascanner.ui.components.CameraScannerOverlay(
+                visible = showCamera,
+                onResult = { code -> commitScan(code) },
+                onClose = { showCamera = false }
+            )
+        }
     }
 
     val activity = context as? ComponentActivity

@@ -19,6 +19,8 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.Icon
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.Button
@@ -54,6 +56,7 @@ import androidx.compose.material.icons.outlined.PhotoCamera
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
+import com.tsd.ascanner.utils.DebugFlags
 
 @Composable
 fun PosScreen(
@@ -245,20 +248,6 @@ fun PosScreen(
                         }
                         Spacer(modifier = Modifier.width(12.dp))
                         Button(
-                            onClick = { showCamera.value = true },
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = colors.secondary,
-                                contentColor = colors.textPrimary
-                            )
-                        ) {
-                            androidx.compose.material3.Icon(
-                                imageVector = Icons.Outlined.PhotoCamera,
-                                contentDescription = "Камера"
-                            )
-                            Text(text = "Камера", modifier = Modifier.padding(start = 8.dp))
-                        }
-                        Spacer(modifier = Modifier.width(12.dp))
-                        Button(
                             onClick = { showDeleteAll.value = true },
                             colors = ButtonDefaults.buttonColors(
                                 containerColor = colors.secondary,
@@ -417,11 +406,30 @@ fun PosScreen(
             }
         }
 
-        com.tsd.ascanner.ui.components.CameraScannerOverlay(
-            visible = showCamera.value,
-            onResult = { code -> handleScan(code) },
-            onClose = { showCamera.value = false }
-        )
+        if (DebugFlags.CAMERA_SCAN_ENABLED) {
+            com.tsd.ascanner.ui.components.CameraScannerOverlay(
+                visible = showCamera.value,
+                onResult = { code -> handleScan(code) },
+                onClose = { showCamera.value = false }
+            )
+        }
+
+        if (DebugFlags.CAMERA_SCAN_ENABLED) {
+            Column(
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .padding(16.dp),
+                horizontalAlignment = Alignment.End
+            ) {
+                FloatingActionButton(
+                    onClick = { showCamera.value = true },
+                    containerColor = colors.secondary,
+                    contentColor = colors.textPrimary
+                ) {
+                    Icon(imageVector = Icons.Outlined.PhotoCamera, contentDescription = "Сканировать камерой")
+                }
+            }
+        }
 
         // Confirm: delete all
         if (showDeleteAll.value) {

@@ -52,6 +52,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
+import com.tsd.ascanner.utils.DebugFlags
 
 @Composable
 fun DocScreen(
@@ -404,20 +405,24 @@ fun DocScreen(
             ) {
                 Icon(imageVector = Icons.Outlined.Refresh, contentDescription = "Обновить")
             }
-            FloatingActionButton(
-                onClick = { showCamera = true },
-                containerColor = colors.secondary,
-                contentColor = colors.textPrimary
-            ) {
-                Icon(imageVector = Icons.Outlined.PhotoCamera, contentDescription = "Сканировать камерой")
+            if (DebugFlags.CAMERA_SCAN_ENABLED) {
+                FloatingActionButton(
+                    onClick = { showCamera = true },
+                    containerColor = colors.secondary,
+                    contentColor = colors.textPrimary
+                ) {
+                    Icon(imageVector = Icons.Outlined.PhotoCamera, contentDescription = "Сканировать камерой")
+                }
             }
         }
 
-        com.tsd.ascanner.ui.components.CameraScannerOverlay(
-            visible = showCamera,
-            onResult = { code -> handleScan(code) },
-            onClose = { showCamera = false }
-        )
+        if (DebugFlags.CAMERA_SCAN_ENABLED) {
+            com.tsd.ascanner.ui.components.CameraScannerOverlay(
+                visible = showCamera,
+                onResult = { code -> handleScan(code) },
+                onClose = { showCamera = false }
+            )
+        }
 
         if (globalLoading.value || loadingPosId != null) {
             Box(modifier = Modifier.fillMaxSize()) {
