@@ -10,6 +10,8 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.border
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.LinearProgressIndicator
@@ -76,6 +78,7 @@ fun DocScreen(
     val isRequesting = remember { mutableStateOf(false) }
     var loadingPosId by remember { mutableStateOf<String?>(null) }
     var showCamera by remember { mutableStateOf(false) }
+    val listState = rememberLazyListState()
 
     fun handleScan(code: String) {
         val currentFormId = docState.value?.formId ?: docsService.currentDoc?.formId
@@ -211,8 +214,24 @@ fun DocScreen(
 		}
 	}
 
+    // If server specified SelectedId, auto-scroll to it
+    LaunchedEffect(doc?.selectedId) {
+        val selected = doc?.selectedId
+        if (!selected.isNullOrBlank()) {
+            val idx = doc?.items?.indexOfFirst { it.id == selected } ?: -1
+            if (idx >= 0) {
+                // +1 for the header item at the top
+                val targetIndex = idx + 1
+                val total = listState.layoutInfo.totalItemsCount
+                if (targetIndex in 0 until total) {
+                    listState.animateScrollToItem(targetIndex)
+                }
+            }
+        }
+    }
+
     Box(modifier = Modifier.fillMaxSize().padding(paddingValues)) {
-        LazyColumn(modifier = Modifier.fillMaxSize()) {
+        LazyColumn(modifier = Modifier.fillMaxSize(), state = listState) {
             item {
                 Column(modifier = Modifier.padding(12.dp)) {
                     val header = doc?.headerText ?: ""
@@ -269,6 +288,13 @@ fun DocScreen(
                 Card(
                     modifier = Modifier
                         .padding(horizontal = 12.dp, vertical = 6.dp)
+                        .then(
+                            if (!doc?.selectedId.isNullOrBlank() && doc?.selectedId == it.id) {
+                                Modifier.border(width = 2.dp, color = Color.Black, shape = MaterialTheme.shapes.medium)
+                            } else {
+                                Modifier
+                            }
+                        )
                         .fillMaxWidth()
                         .clickable {
                             val formId = it.id
@@ -386,25 +412,27 @@ fun DocScreen(
             horizontalAlignment = Alignment.End,
             verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(12.dp)
         ) {
-            FloatingActionButton(
-                onClick = {
-                    val formId = doc?.formId
-                    if (!formId.isNullOrBlank()) {
-                        scope.launch {
-                            try {
-                                globalLoading.value = true
-                                val fresh = docsService.fetchDoc(formId, logRequest = true)
-                                docsService.currentDoc = fresh
-                                docState.value = fresh
-                            } catch (_: Exception) {
-                            } finally { globalLoading.value = false }
+            if (DebugFlags.REFRESH_BUTTONS_ENABLED) {
+                FloatingActionButton(
+                    onClick = {
+                        val formId = doc?.formId
+                        if (!formId.isNullOrBlank()) {
+                            scope.launch {
+                                try {
+                                    globalLoading.value = true
+                                    val fresh = docsService.fetchDoc(formId, logRequest = true)
+                                    docsService.currentDoc = fresh
+                                    docState.value = fresh
+                                } catch (_: Exception) {
+                                } finally { globalLoading.value = false }
+                            }
                         }
-                    }
-                },
-                containerColor = colors.secondary,
-                contentColor = colors.textPrimary
-            ) {
-                Icon(imageVector = Icons.Outlined.Refresh, contentDescription = "Обновить")
+                    },
+                    containerColor = colors.secondary,
+                    contentColor = colors.textPrimary
+                ) {
+                    Icon(imageVector = Icons.Outlined.Refresh, contentDescription = "Обновить")
+                }
             }
             if (DebugFlags.CAMERA_SCAN_ENABLED) {
                 FloatingActionButton(

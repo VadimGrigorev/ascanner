@@ -39,6 +39,7 @@ data class DocOneResponse(
     @SerializedName("MessageType") val messageType: String? = null, // "refresh"
     @SerializedName("Form") val form: String? = null,               // "doc"
     @SerializedName("FormId") val formId: String? = null,
+    @SerializedName("SelectedId") val selectedId: String? = null,
     @SerializedName("HeaderText") val headerText: String? = null,
     @SerializedName("StatusText") val statusText: String? = null,
     @SerializedName("Status") val status: String? = null,
@@ -84,6 +85,7 @@ data class PosResponse(
     @SerializedName("MessageType") val messageType: String? = null, // "refresh"
     @SerializedName("Form") val form: String? = null,               // "pos"
     @SerializedName("FormId") val formId: String? = null,
+    @SerializedName("SelectedId") val selectedId: String? = null,
     @SerializedName("HeaderText") val headerText: String? = null,
     @SerializedName("StatusText") val statusText: String? = null,
     @SerializedName("Status") val status: String? = null,

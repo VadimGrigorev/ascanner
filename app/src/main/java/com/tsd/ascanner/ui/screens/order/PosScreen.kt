@@ -9,10 +9,12 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.border
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -78,6 +80,7 @@ fun PosScreen(
     val pendingDeleteItemId = remember { mutableStateOf<String?>(null) }
     val posLoading = remember { mutableStateOf(false) }
     val showCamera = remember { mutableStateOf(false) }
+    val listState = rememberLazyListState()
     LaunchedEffect(lastScan.value) {
         val hasText = !lastScan.value.isNullOrBlank()
         if (hasText) {
@@ -169,6 +172,22 @@ fun PosScreen(
 		}
 	}
 
+	// If server specified SelectedId, auto-scroll to it
+	LaunchedEffect(pos?.selectedId) {
+		val selected = pos?.selectedId
+		if (!selected.isNullOrBlank()) {
+			val idx = pos?.items?.indexOfFirst { it.id == selected } ?: -1
+			if (idx >= 0) {
+				// +1 for the header item at the top
+				val targetIndex = idx + 1
+				val total = listState.layoutInfo.totalItemsCount
+				if (targetIndex in 0 until total) {
+					listState.animateScrollToItem(targetIndex)
+				}
+			}
+		}
+	}
+
     // Sync scan overlay with HW trigger via Zebra DataWedge (if available)
     androidx.compose.runtime.DisposableEffect(Unit) {
         val receiver = object : BroadcastReceiver() {
@@ -201,7 +220,7 @@ fun PosScreen(
     }
 
     Box(modifier = Modifier.fillMaxSize().padding(paddingValues)) {
-        LazyColumn(modifier = Modifier.fillMaxSize()) {
+        LazyColumn(modifier = Modifier.fillMaxSize(), state = listState) {
             item {
                 Column(modifier = Modifier.padding(12.dp)) {
                     val header = pos?.headerText ?: ""
@@ -288,6 +307,13 @@ fun PosScreen(
                 Card(
                     modifier = Modifier
                         .padding(horizontal = 12.dp, vertical = 6.dp)
+                        .then(
+                            if (!pos?.selectedId.isNullOrBlank() && pos?.selectedId == it.id) {
+                                Modifier.border(width = 2.dp, color = Color.Black, shape = MaterialTheme.shapes.medium)
+                            } else {
+                                Modifier
+                            }
+                        )
                         .fillMaxWidth(),
 					colors = CardDefaults.cardColors(containerColor = itemBg)
                 ) {

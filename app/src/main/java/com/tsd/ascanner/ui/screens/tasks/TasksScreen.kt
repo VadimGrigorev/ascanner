@@ -465,12 +465,14 @@ fun TasksScreen(
             verticalArrangement = Arrangement.spacedBy(12.dp),
             horizontalAlignment = Alignment.End
         ) {
-            FloatingActionButton(
-                onClick = { vm.refresh() },
-                containerColor = colors.secondary,
-                contentColor = colors.textPrimary
-            ) {
-                Icon(imageVector = Icons.Outlined.Refresh, contentDescription = "Обновить")
+            if (DebugFlags.REFRESH_BUTTONS_ENABLED) {
+                FloatingActionButton(
+                    onClick = { vm.refresh() },
+                    containerColor = colors.secondary,
+                    contentColor = colors.textPrimary
+                ) {
+                    Icon(imageVector = Icons.Outlined.Refresh, contentDescription = "Обновить")
+                }
             }
             if (DebugFlags.CAMERA_SCAN_ENABLED) {
                 FloatingActionButton(
