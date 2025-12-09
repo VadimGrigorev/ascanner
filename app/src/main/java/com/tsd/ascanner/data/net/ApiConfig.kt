@@ -18,11 +18,20 @@ object ApiConfig {
 			}
 
 			// If user entered only a number (e.g. "151"), treat as 192.168.1.151:80
-			val hostPort = if (noScheme.all { it.isDigit() }) {
-				"192.168.1.$noScheme:80"
-			} else {
-				noScheme
-			}
+			// If user entered two numbers separated by dot (e.g. "4.110"), treat as 192.168.4.110:80
+			val hostPort =
+				if (noScheme.all { it.isDigit() }) {
+					"192.168.1.$noScheme:80"
+				} else if (noScheme.count { it == '.' } == 1) {
+					val parts = noScheme.split('.')
+					if (parts.size == 2 && parts[0].all { it.isDigit() } && parts[1].all { it.isDigit() }) {
+						"192.168.${parts[0]}.${parts[1]}:80"
+					} else {
+						noScheme
+					}
+				} else {
+					noScheme
+				}
 
 			return when {
 				hasHttps -> "https://$hostPort"
