@@ -113,6 +113,9 @@ class LoginViewModel(
                     is com.tsd.ascanner.data.auth.LoginResult.Error -> {
                         errorMessage = res.message
                     }
+					is com.tsd.ascanner.data.auth.LoginResult.DialogShown -> {
+						// Dialog will be shown via global DialogBus
+					}
                 }
             } catch (e: Exception) {
                 errorMessage = UserMessageMapper.map(e) ?: e.message ?: "Ошибка сети"
@@ -192,6 +195,9 @@ fun LoginScreen(
                                 is com.tsd.ascanner.data.auth.LoginResult.Error -> {
                                     ErrorBus.emit(res.message)
                                 }
+								is com.tsd.ascanner.data.auth.LoginResult.DialogShown -> {
+									// Dialog will be shown via global DialogBus
+								}
                             }
                         } catch (e: Exception) {
                             ErrorBus.emit(UserMessageMapper.map(e) ?: e.message ?: "Ошибка сети")

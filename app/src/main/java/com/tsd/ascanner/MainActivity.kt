@@ -28,6 +28,8 @@ import com.tsd.ascanner.ui.theme.AScannerTheme
 import android.view.KeyEvent
 import com.tsd.ascanner.utils.ScanTriggerBus
 import com.tsd.ascanner.utils.ErrorBus
+import com.tsd.ascanner.utils.DialogBus
+import com.tsd.ascanner.utils.ServerDialog
 import com.tsd.ascanner.utils.AppEvent
 import com.tsd.ascanner.utils.AppEventBus
 import androidx.compose.foundation.layout.Box
@@ -35,9 +37,14 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.material3.Text
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.TextButton
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.flow.collectLatest
@@ -45,6 +52,8 @@ import androidx.compose.foundation.clickable
 import kotlinx.coroutines.delay
 import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.launch
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.window.DialogProperties
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -60,11 +69,20 @@ class MainActivity : ComponentActivity() {
 
                 val appColors = com.tsd.ascanner.ui.theme.AppTheme.colors
                 var globalError by remember { mutableStateOf<String?>(null) }
+				var globalDialog by remember { mutableStateOf<ServerDialog?>(null) }
+				var dialogSending by remember { mutableStateOf(false) }
+				val scope = rememberCoroutineScope()
                 LaunchedEffect(Unit) {
                     ErrorBus.events.collectLatest { msg ->
                         globalError = msg
                     }
                 }
+				LaunchedEffect(Unit) {
+					DialogBus.events.collectLatest { dlg ->
+						globalDialog = dlg
+						dialogSending = false
+					}
+				}
 				LaunchedEffect(Unit) {
 					AppEventBus.events.collectLatest { ev ->
 						when (ev) {
@@ -154,6 +172,73 @@ class MainActivity : ComponentActivity() {
                                 Text(text = err, color = Color.Red)
                             }
                         }
+
+						// Global server-driven dialog (MessageType="dialog")
+						val dlg = globalDialog
+						if (dlg != null) {
+							val bg = when (dlg.status.lowercase()) {
+								"closed" -> appColors.statusDoneBg
+								"pending" -> appColors.statusPendingBg
+								"warning" -> appColors.statusWarningBg
+								"error" -> appColors.statusErrorBg
+								else -> appColors.statusTodoBg
+							}
+							val fg = if (bg.luminance() < 0.45f) Color.White else Color.Black
+							AlertDialog(
+								onDismissRequest = { /* non-dismissible */ },
+								properties = DialogProperties(
+									dismissOnBackPress = false,
+									dismissOnClickOutside = false
+								),
+								containerColor = bg,
+								title = {
+									val title = dlg.header.ifBlank { "Сообщение" }
+									Text(text = title, color = fg)
+								},
+								text = {
+									val text = dlg.text.ifBlank { "" }
+									Text(text = text, color = fg)
+								},
+								confirmButton = {
+									Row(
+										horizontalArrangement = Arrangement.spacedBy(8.dp),
+										verticalAlignment = Alignment.CenterVertically
+									) {
+										val buttons = if (dlg.buttons.isNotEmpty()) dlg.buttons
+										else listOf(com.tsd.ascanner.utils.ServerDialogButton(name = "OK", id = ""))
+										buttons.forEach { b ->
+											TextButton(
+												enabled = !dialogSending,
+												onClick = {
+													// Close current dialog immediately to avoid double taps
+													globalDialog = null
+													dialogSending = true
+													if (b.id.isBlank()) {
+														dialogSending = false
+														return@TextButton
+													}
+													scope.launch {
+														try {
+															when (val res = app.docsService.sendButton(dlg.form, dlg.formId, b.id)) {
+																is com.tsd.ascanner.data.docs.ButtonResult.Success -> Unit
+																is com.tsd.ascanner.data.docs.ButtonResult.DialogShown -> Unit
+																is com.tsd.ascanner.data.docs.ButtonResult.Error -> {
+																	ErrorBus.emit(res.message)
+																}
+															}
+														} finally {
+															dialogSending = false
+														}
+													}
+												}
+											) {
+												Text(text = b.name.ifBlank { "OK" }, color = fg)
+											}
+										}
+									}
+								}
+							)
+						}
                     }
                 }
             }

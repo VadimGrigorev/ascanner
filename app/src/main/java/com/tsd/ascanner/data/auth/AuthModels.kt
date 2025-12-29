@@ -45,6 +45,7 @@ data class LogoutRequest(
 sealed interface LoginResult {
     data class Success(val bearer: String) : LoginResult
     data class Error(val message: String) : LoginResult
+	data object DialogShown : LoginResult
 }
 
 

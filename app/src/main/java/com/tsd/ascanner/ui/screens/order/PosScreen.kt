@@ -50,6 +50,7 @@ import com.tsd.ascanner.utils.DataWedge
 import com.tsd.ascanner.utils.ScanTriggerBus
 import kotlinx.coroutines.flow.collectLatest
 import com.tsd.ascanner.utils.ErrorBus
+import com.tsd.ascanner.utils.ServerDialogShownException
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Delete
@@ -106,6 +107,10 @@ fun PosScreen(
                         scanError.value = res.message
                         isScanning.value = true
                     }
+					is com.tsd.ascanner.data.docs.ScanPosResult.DialogShown -> {
+						// Dialog will be shown via global DialogBus
+						isScanning.value = false
+					}
                 }
             } catch (e: Exception) {
                 scanError.value = e.message ?: "Ошибка запроса"
@@ -247,7 +252,9 @@ fun PosScreen(
                                         app.docsService.currentPos = fresh
                                         posState.value = fresh
                                     } catch (e: Exception) {
-                                        ErrorBus.emit(e.message ?: "Ошибка запроса")
+										if (e !is ServerDialogShownException) {
+											ErrorBus.emit(e.message ?: "Ошибка запроса")
+										}
                                     } finally {
                                         posLoading.value = false
                                     }
@@ -483,6 +490,9 @@ fun PosScreen(
                                         is com.tsd.ascanner.data.docs.ScanPosResult.Error -> {
                                             ErrorBus.emit(res.message)
                                         }
+										is com.tsd.ascanner.data.docs.ScanPosResult.DialogShown -> {
+											// Dialog will be shown via global DialogBus
+										}
                                     }
                                 } catch (e: Exception) {
                                     ErrorBus.emit(e.message ?: "Ошибка запроса")
@@ -525,6 +535,9 @@ fun PosScreen(
                                         is com.tsd.ascanner.data.docs.ScanPosResult.Error -> {
                                             ErrorBus.emit(res.message)
                                         }
+										is com.tsd.ascanner.data.docs.ScanPosResult.DialogShown -> {
+											// Dialog will be shown via global DialogBus
+										}
                                     }
                                 } catch (e: Exception) {
                                     ErrorBus.emit(e.message ?: "Ошибка запроса")

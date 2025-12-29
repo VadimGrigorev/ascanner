@@ -15,6 +15,10 @@ import java.net.URL
 import javax.net.ssl.HttpsURLConnection
 import com.tsd.ascanner.utils.ErrorBus
 import com.tsd.ascanner.utils.AppEventBus
+import com.tsd.ascanner.utils.DialogBus
+import com.tsd.ascanner.utils.ServerDialog
+import com.tsd.ascanner.utils.ServerDialogButton
+import com.tsd.ascanner.utils.ServerDialogShownException
 
 class ApiClient(
     private val gson: Gson = Gson()
@@ -70,7 +74,7 @@ class ApiClient(
                         })
                     }
                     // Global server-side error detection
-                    throwIfServerError(responseText)
+                    throwIfServerError(responseText, throwOnDialog = true)
                     if (code !in 200..299) {
                         throw IllegalStateException("HTTP $code: $responseText")
                     }
@@ -125,7 +129,7 @@ class ApiClient(
                         })
                     }
                     // Global server-side error detection
-                    throwIfServerError(responseText)
+                    throwIfServerError(responseText, throwOnDialog = false)
                     if (code !in 200..299) {
                         throw IllegalStateException("HTTP $code: $responseText")
                     }
@@ -135,13 +139,42 @@ class ApiClient(
                 }
         }
 
-    private fun throwIfServerError(responseText: String) {
+    private fun throwIfServerError(responseText: String, throwOnDialog: Boolean) {
         try {
             val element = gson.fromJson(responseText, com.google.gson.JsonElement::class.java)
             if (element != null && element.isJsonObject) {
                 val obj = element.asJsonObject
                 val mt = if (obj.has("MessageType")) obj.get("MessageType").asString else null
 				val form = if (obj.has("Form")) obj.get("Form").asString else null
+				if (mt != null && mt.equals("dialog", ignoreCase = true)) {
+					val formId = if (obj.has("FormId")) obj.get("FormId").asString else ""
+					val header = if (obj.has("DialogHeader")) obj.get("DialogHeader").asString else ""
+					val text = if (obj.has("DialogText")) obj.get("DialogText").asString else ""
+					val status = if (obj.has("Status")) obj.get("Status").asString else ""
+					val buttons = buildList {
+						if (obj.has("Buttons") && obj.get("Buttons").isJsonArray) {
+							for (el in obj.getAsJsonArray("Buttons")) {
+								if (!el.isJsonObject) continue
+								val b = el.asJsonObject
+								val name = if (b.has("Name")) b.get("Name").asString else ""
+								val id = if (b.has("Id")) b.get("Id").asString else ""
+								if (id.isNotBlank()) add(ServerDialogButton(name = name.ifBlank { id }, id = id))
+							}
+						}
+					}
+					DialogBus.emit(
+						ServerDialog(
+							form = form ?: "",
+							formId = formId,
+							header = header,
+							text = text,
+							status = status,
+							buttons = buttons
+						)
+					)
+					if (throwOnDialog) throw ServerDialogShownException()
+					return
+				}
                 if (mt != null && mt.equals("error", ignoreCase = true)) {
                     val msg = if (obj.has("Message")) obj.get("Message").asString else "Ошибка"
 					// Emit to global error bus for top-of-screen banner
@@ -153,7 +186,8 @@ class ApiClient(
                     throw IllegalStateException(msg)
                 }
             }
-        } catch (_: Exception) {
+        } catch (e: Exception) {
+			if (e is ServerDialogShownException) throw e
             // Non-JSON or invalid JSON: ignore here, HTTP code handling covers non-JSON errors
         }
     }

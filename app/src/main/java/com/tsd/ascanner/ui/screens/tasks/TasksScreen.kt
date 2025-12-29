@@ -109,6 +109,10 @@ fun TasksScreen(
                         scanError = res.message
                         isScanning = true
                     }
+					is com.tsd.ascanner.data.docs.ScanDocResult.DialogShown -> {
+						// Dialog will be shown via global DialogBus
+						isScanning = false
+					}
                 }
             } catch (e: Exception) {
                 scanError = e.message ?: "Ошибка запроса"
@@ -295,6 +299,9 @@ fun TasksScreen(
 												is com.tsd.ascanner.data.docs.ScanDocResult.Error -> {
 													scanError = res.message
 													isScanning = true
+												}
+												is com.tsd.ascanner.data.docs.ScanDocResult.DialogShown -> {
+													isScanning = false
 												}
 											}
 										} catch (e: Exception) {

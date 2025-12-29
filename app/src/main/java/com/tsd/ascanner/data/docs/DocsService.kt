@@ -2,6 +2,8 @@ package com.tsd.ascanner.data.docs
 
 import com.tsd.ascanner.data.auth.AuthService
 import com.tsd.ascanner.data.net.ApiClient
+import com.google.gson.Gson
+import com.tsd.ascanner.utils.ServerDialogShownException
 
 class DocsService(
     private val apiClient: ApiClient,
@@ -39,6 +41,9 @@ class DocsService(
             val doc = fetchDoc(formId, logRequest = true)
             currentDoc = doc
             ScanDocResult.Success(doc)
+        } catch (_: ServerDialogShownException) {
+            // Dialog will be shown via global DialogBus
+            ScanDocResult.DialogShown
         } catch (e: Exception) {
             ScanDocResult.Error(e.message ?: "Ошибка")
         }
@@ -50,21 +55,29 @@ class DocsService(
         val element = apiClient.postForJsonElement("/scanlist", req, logRequest = true)
         val obj = element.asJsonObject
         val messageType = if (obj.has("MessageType")) obj.get("MessageType").asString else null
+		if (messageType != null && messageType.equals("dialog", ignoreCase = true)) {
+			return ScanDocResult.DialogShown
+		}
         if (messageType != null && messageType.equals("error", ignoreCase = true)) {
             val msg = if (obj.has("Message")) obj.get("Message").asString else "Ошибка"
             return ScanDocResult.Error(msg)
         }
         val form = if (obj.has("Form")) obj.get("Form").asString else null
         return if (form != null && form.equals("doc", ignoreCase = true)) {
-            val doc = com.google.gson.Gson().fromJson(obj, DocOneResponse::class.java)
+            val doc = Gson().fromJson(obj, DocOneResponse::class.java)
             currentDoc = doc
             ScanDocResult.Success(doc)
         } else {
             val selectedId = if (obj.has("SelectedId")) obj.get("SelectedId").asString else null
             if (!selectedId.isNullOrBlank()) {
-                val doc = fetchDoc(selectedId, logRequest = true)
-                currentDoc = doc
-                ScanDocResult.Success(doc)
+                try {
+                    val doc = fetchDoc(selectedId, logRequest = true)
+                    currentDoc = doc
+                    ScanDocResult.Success(doc)
+                } catch (_: ServerDialogShownException) {
+                    // Dialog will be shown via global DialogBus
+                    ScanDocResult.DialogShown
+                }
             } else {
                 ScanDocResult.Error("Документ не найден")
             }
@@ -77,11 +90,14 @@ class DocsService(
         val element = apiClient.postForJsonElement("/scan", req, logRequest = true)
         val obj = element.asJsonObject
         val messageType = if (obj.has("MessageType")) obj.get("MessageType").asString else null
+		if (messageType != null && messageType.equals("dialog", ignoreCase = true)) {
+			return ScanDocResult.DialogShown
+		}
         if (messageType != null && messageType.equals("error", ignoreCase = true)) {
             val msg = if (obj.has("Message")) obj.get("Message").asString else "Ошибка"
             return ScanDocResult.Error(msg)
         }
-        val doc = com.google.gson.Gson().fromJson(obj, DocOneResponse::class.java)
+        val doc = Gson().fromJson(obj, DocOneResponse::class.java)
         currentDoc = doc
         return ScanDocResult.Success(doc)
     }
@@ -98,11 +114,14 @@ class DocsService(
         val element = apiClient.postForJsonElement("/scanone", req, logRequest = true)
         val obj = element.asJsonObject
         val messageType = if (obj.has("MessageType")) obj.get("MessageType").asString else null
+		if (messageType != null && messageType.equals("dialog", ignoreCase = true)) {
+			return ScanPosResult.DialogShown
+		}
         if (messageType != null && messageType.equals("error", ignoreCase = true)) {
             val msg = if (obj.has("Message")) obj.get("Message").asString else "Ошибка"
             return ScanPosResult.Error(msg)
         }
-        val pos = com.google.gson.Gson().fromJson(obj, PosResponse::class.java)
+        val pos = Gson().fromJson(obj, PosResponse::class.java)
         currentPos = pos
         return ScanPosResult.Success(pos)
     }
@@ -113,11 +132,14 @@ class DocsService(
         val element = apiClient.postForJsonElement("/posdelete", req, logRequest = true)
         val obj = element.asJsonObject
         val messageType = if (obj.has("MessageType")) obj.get("MessageType").asString else null
+		if (messageType != null && messageType.equals("dialog", ignoreCase = true)) {
+			return ScanPosResult.DialogShown
+		}
         if (messageType != null && messageType.equals("error", ignoreCase = true)) {
             val msg = if (obj.has("Message")) obj.get("Message").asString else "Ошибка"
             return ScanPosResult.Error(msg)
         }
-        val pos = com.google.gson.Gson().fromJson(obj, PosResponse::class.java)
+        val pos = Gson().fromJson(obj, PosResponse::class.java)
         currentPos = pos
         return ScanPosResult.Success(pos)
     }
@@ -128,14 +150,49 @@ class DocsService(
         val element = apiClient.postForJsonElement("/posdelete", req, logRequest = true)
         val obj = element.asJsonObject
         val messageType = if (obj.has("MessageType")) obj.get("MessageType").asString else null
+		if (messageType != null && messageType.equals("dialog", ignoreCase = true)) {
+			return ScanPosResult.DialogShown
+		}
         if (messageType != null && messageType.equals("error", ignoreCase = true)) {
             val msg = if (obj.has("Message")) obj.get("Message").asString else "Ошибка"
             return ScanPosResult.Error(msg)
         }
-        val pos = com.google.gson.Gson().fromJson(obj, PosResponse::class.java)
+        val pos = Gson().fromJson(obj, PosResponse::class.java)
         currentPos = pos
         return ScanPosResult.Success(pos)
     }
+
+	suspend fun sendButton(form: String, formId: String, buttonId: String): ButtonResult {
+		val bearer = authService.bearer ?: return ButtonResult.Error("Нет токена авторизации")
+		val req = ButtonRequest(bearer = bearer, form = form, formId = formId, buttonId = buttonId)
+		return try {
+			val element = apiClient.postForJsonElement("/button", req, logRequest = true)
+			if (!element.isJsonObject) return ButtonResult.Success
+			val obj = element.asJsonObject
+			val messageType = if (obj.has("MessageType")) obj.get("MessageType").asString else null
+			if (messageType != null && messageType.equals("dialog", ignoreCase = true)) {
+				return ButtonResult.DialogShown
+			}
+			if (messageType != null && messageType.equals("error", ignoreCase = true)) {
+				val msg = if (obj.has("Message")) obj.get("Message").asString else "Ошибка"
+				return ButtonResult.Error(msg)
+			}
+			val respForm = if (obj.has("Form")) obj.get("Form").asString else form
+			when (respForm.lowercase()) {
+				"doc" -> {
+					val doc = Gson().fromJson(obj, DocOneResponse::class.java)
+					currentDoc = doc
+				}
+				"pos" -> {
+					val pos = Gson().fromJson(obj, PosResponse::class.java)
+					currentPos = pos
+				}
+			}
+			ButtonResult.Success
+		} catch (e: Exception) {
+			ButtonResult.Error(e.message ?: "Ошибка запроса")
+		}
+	}
 
     fun clear() {
         currentDoc = null
@@ -146,11 +203,19 @@ class DocsService(
 sealed interface ScanDocResult {
     data class Success(val doc: DocOneResponse) : ScanDocResult
     data class Error(val message: String) : ScanDocResult
+	data object DialogShown : ScanDocResult
 }
 
 sealed interface ScanPosResult {
     data class Success(val pos: PosResponse) : ScanPosResult
     data class Error(val message: String) : ScanPosResult
+	data object DialogShown : ScanPosResult
+}
+
+sealed interface ButtonResult {
+	data object Success : ButtonResult
+	data class Error(val message: String) : ButtonResult
+	data object DialogShown : ButtonResult
 }
 
 

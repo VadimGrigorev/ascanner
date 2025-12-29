@@ -1,0 +1,11 @@
+﻿{
+ "MessageType":"dialognum",
+ "Form":"doc",
+ "FormId":"2025_ОЗ0000058104",
+ "DialogHeader":"Вопрос",
+ "DialogText":"Введите необходимое количество:",
+ "Status":"warning",
+ "NumberLength":"15",
+ "NumberScale":"3",
+ "NumberId":"2025_ОЗ0000058104_000000060234/000000000149_N"
+}

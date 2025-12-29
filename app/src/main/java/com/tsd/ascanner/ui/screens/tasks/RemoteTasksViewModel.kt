@@ -7,6 +7,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.tsd.ascanner.data.docs.DocsService
 import com.tsd.ascanner.data.docs.TaskDto
+import com.tsd.ascanner.utils.ServerDialogShownException
 import kotlinx.coroutines.launch
 
 class RemoteTasksViewModel(
@@ -42,7 +43,9 @@ class RemoteTasksViewModel(
 					val resp = docsService.fetchDocs(logRequest = true)
 					tasks = resp.tasks
 				} catch (e: Exception) {
-					errorMessage = e.message ?: "Ошибка загрузки документов"
+					if (e !is ServerDialogShownException) {
+						errorMessage = e.message ?: "Ошибка загрузки документов"
+					}
 				} finally {
 					isLoading = false
 					showLoadingIndicator = true
@@ -59,7 +62,9 @@ class RemoteTasksViewModel(
 					tasks = resp.tasks
 				} catch (e: Exception) {
 					// Можно при желании не трогать errorMessage, чтобы не спамить баннером
-					errorMessage = e.message ?: "Ошибка загрузки документов"
+					if (e !is ServerDialogShownException) {
+						errorMessage = e.message ?: "Ошибка загрузки документов"
+					}
 				} finally {
 					isAutoRefreshing = false
 				}
@@ -90,7 +95,9 @@ class RemoteTasksViewModel(
                 docsService.currentDoc = doc
                 onSuccessOpen()
             } catch (e: Exception) {
-                errorMessage = e.message ?: "Ошибка открытия документа"
+				if (e !is ServerDialogShownException) {
+					errorMessage = e.message ?: "Ошибка открытия документа"
+				}
             } finally {
                 isLoading = false
             }

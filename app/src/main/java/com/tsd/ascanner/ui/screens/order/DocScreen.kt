@@ -50,6 +50,7 @@ import com.tsd.ascanner.utils.DataWedge
 import com.tsd.ascanner.utils.ScanTriggerBus
 import kotlinx.coroutines.flow.collectLatest
 import com.tsd.ascanner.utils.ErrorBus
+import com.tsd.ascanner.utils.ServerDialogShownException
 import androidx.compose.runtime.LaunchedEffect
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.Lifecycle
@@ -97,6 +98,10 @@ fun DocScreen(
                         scanError.value = res.message
                         isScanning.value = true
                     }
+					is com.tsd.ascanner.data.docs.ScanDocResult.DialogShown -> {
+						// Dialog will be shown via global DialogBus
+						isScanning.value = false
+					}
                 }
             } catch (e: Exception) {
                 scanError.value = e.message ?: "Ошибка запроса"
@@ -306,7 +311,9 @@ fun DocScreen(
                                     docsService.currentPos = pos
                                     onOpenPosition()
                                 } catch (e: Exception) {
-                                    errorMessage.value = e.message ?: "Ошибка загрузки позиции"
+									if (e !is ServerDialogShownException) {
+										errorMessage.value = e.message ?: "Ошибка загрузки позиции"
+									}
                                 } finally {
                                     loadingPosId = null
                                 }

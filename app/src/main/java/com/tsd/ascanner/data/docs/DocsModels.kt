@@ -109,4 +109,13 @@ data class PosDeleteRequest(
     @SerializedName("DeleteId") val deleteId: String = ""
 )
 
+// Request triggered by server-driven dialog button press
+data class ButtonRequest(
+	@SerializedName("Bearer") val bearer: String,
+	@SerializedName("Form") val form: String,
+	@SerializedName("FormId") val formId: String,
+	@SerializedName("Request") val request: String = "dialog",
+	@SerializedName("ButtonId") val buttonId: String
+)
+
 
