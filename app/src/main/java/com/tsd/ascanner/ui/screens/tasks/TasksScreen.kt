@@ -202,7 +202,7 @@ fun TasksScreen(
         }
     }
 
-    Box(modifier = Modifier.padding(paddingValues)) {
+    Box(modifier = Modifier.fillMaxSize().padding(paddingValues)) {
         // Always-on hidden input to catch wedge text even without overlay
         AndroidView(
             factory = { ctx ->
@@ -265,7 +265,7 @@ fun TasksScreen(
 			update = { v -> v.post { if (!searchFocused) v.requestFocus() } }
         )
 
-        LazyColumn(modifier = Modifier.fillMaxWidth()) {
+        LazyColumn(modifier = Modifier.fillMaxSize()) {
             // Header: filter and errors
             item {
                 Column(modifier = Modifier.padding(12.dp)) {
