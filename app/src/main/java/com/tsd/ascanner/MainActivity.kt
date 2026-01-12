@@ -257,10 +257,13 @@ class MainActivity : ComponentActivity() {
     }
 
     override fun onStop() {
-        // App going to background or finishing from tasks screen -> notify server
+        // IMPORTANT:
+        // Do NOT logout on simple backgrounding (Home/app switch), otherwise returning to the app
+        // causes server-side bearer invalidation and the app gets redirected to login on next request.
+        // Logout only when Activity is actually finishing (closed by user / removed from recents).
         val app = applicationContext as AScannerApp
-        if (app.authService.bearer != null) {
-            lifecycleScope.launch {
+        if (isFinishing && app.authService.bearer != null) {
+            app.appScope.launch {
                 runCatching { app.authService.logout() }
             }
         }

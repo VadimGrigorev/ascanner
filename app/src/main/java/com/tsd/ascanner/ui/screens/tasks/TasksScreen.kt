@@ -65,6 +65,7 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import com.tsd.ascanner.utils.DebugFlags
+import com.tsd.ascanner.utils.DebugSession
 
 class TasksViewModel(private val service: DocsService) : ViewModel()
 
@@ -481,7 +482,7 @@ fun TasksScreen(
                     Icon(imageVector = Icons.Outlined.Refresh, contentDescription = "Обновить")
                 }
             }
-            if (DebugFlags.CAMERA_SCAN_ENABLED) {
+            if (DebugFlags.CAMERA_SCAN_ENABLED && DebugSession.debugModeEnabled) {
                 FloatingActionButton(
                     onClick = { showCamera = true },
                     containerColor = colors.secondary,
@@ -493,7 +494,7 @@ fun TasksScreen(
         }
 
         // Camera overlay
-        if (DebugFlags.CAMERA_SCAN_ENABLED) {
+        if (DebugFlags.CAMERA_SCAN_ENABLED && DebugSession.debugModeEnabled) {
             com.tsd.ascanner.ui.components.CameraScannerOverlay(
                 visible = showCamera,
                 onResult = { code -> commitScan(code) },

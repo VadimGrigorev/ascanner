@@ -60,6 +60,7 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import com.tsd.ascanner.utils.DebugFlags
+import com.tsd.ascanner.utils.DebugSession
 
 @Composable
 fun PosScreen(
@@ -441,7 +442,7 @@ fun PosScreen(
             }
         }
 
-        if (DebugFlags.CAMERA_SCAN_ENABLED) {
+        if (DebugFlags.CAMERA_SCAN_ENABLED && DebugSession.debugModeEnabled) {
             com.tsd.ascanner.ui.components.CameraScannerOverlay(
                 visible = showCamera.value,
                 onResult = { code -> handleScan(code) },
@@ -449,7 +450,7 @@ fun PosScreen(
             )
         }
 
-        if (DebugFlags.CAMERA_SCAN_ENABLED) {
+        if (DebugFlags.CAMERA_SCAN_ENABLED && DebugSession.debugModeEnabled) {
             Column(
                 modifier = Modifier
                     .align(Alignment.BottomEnd)

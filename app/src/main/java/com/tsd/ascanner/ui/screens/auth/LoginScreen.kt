@@ -3,13 +3,16 @@ package com.tsd.ascanner.ui.screens.auth
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -47,6 +50,7 @@ import kotlinx.coroutines.launch
 import com.tsd.ascanner.AScannerApp
 import com.tsd.ascanner.utils.ErrorBus
 import com.tsd.ascanner.utils.UserMessageMapper
+import com.tsd.ascanner.utils.DebugSession
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.draw.alpha
@@ -324,6 +328,20 @@ fun LoginScreen(
                 Text(text = androidx.compose.ui.res.stringResource(id = com.tsd.ascanner.R.string.login_action))
             }
         }
+
+		Spacer(Modifier.height(12.dp))
+
+		Row(
+			modifier = Modifier.fillMaxWidth(),
+			verticalAlignment = Alignment.CenterVertically
+		) {
+			Checkbox(
+				checked = DebugSession.debugModeEnabled,
+				onCheckedChange = { DebugSession.debugModeEnabled = it }
+			)
+			Spacer(modifier = Modifier.width(8.dp))
+			Text(text = "Режим отладки", color = colors.textSecondary)
+		}
 
         Spacer(Modifier.height(8.dp))
     }
