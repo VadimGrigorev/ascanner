@@ -153,7 +153,7 @@ class MainActivity : ComponentActivity() {
                         val err = globalError
                         LaunchedEffect(err) {
                             if (err != null) {
-                                delay(3000)
+                                delay(15000)
                                 if (globalError == err) {
                                     globalError = null
                                 }

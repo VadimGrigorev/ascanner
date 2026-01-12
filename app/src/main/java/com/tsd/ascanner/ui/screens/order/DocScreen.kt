@@ -112,11 +112,11 @@ fun DocScreen(
         }
     }
 
-    // Auto-hide scanned text after 3s
+    // Auto-hide scanned text after 15s
     LaunchedEffect(lastScan.value) {
         val hasText = !lastScan.value.isNullOrBlank()
         if (hasText) {
-            kotlinx.coroutines.delay(3000)
+            kotlinx.coroutines.delay(15000)
             lastScan.value = null
         }
     }
