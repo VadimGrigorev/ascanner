@@ -371,7 +371,7 @@ fun LoginScreen(
 			.padding(16.dp)
 	) {
 		Text(
-			text = "1.3 версия(окно диалога)",
+			text = "1.4 версия(мелкие исправления)",
 			modifier = Modifier.align(Alignment.BottomStart),
 			color = colors.textSecondary
 		)
