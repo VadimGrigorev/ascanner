@@ -28,6 +28,8 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.tsd.ascanner.AScannerApp
@@ -70,8 +72,7 @@ fun PosScreen(
 ) {
     val ctx = androidx.compose.ui.platform.LocalContext.current
     val app = ctx.applicationContext as AScannerApp
-    val posState = remember { mutableStateOf(app.docsService.currentPos) }
-    val pos = posState.value
+	val pos by app.docsService.currentPosFlow.collectAsState()
     val colors = AppTheme.colors
     val scope = rememberCoroutineScope()
     val isScanning = remember { mutableStateOf(false) }
@@ -92,7 +93,7 @@ fun PosScreen(
     }
 
     fun handleScan(code: String) {
-        val currentFormId = posState.value?.formId ?: app.docsService.currentPos?.formId
+        val currentFormId = pos?.formId ?: app.docsService.currentPos?.formId
         if (code.length < 4 || currentFormId.isNullOrBlank()) return
         lastScan.value = code
         scanError.value = null
@@ -101,7 +102,6 @@ fun PosScreen(
                 isRequesting.value = true
                 when (val res = app.docsService.scanPosMark(currentFormId, code)) {
                     is com.tsd.ascanner.data.docs.ScanPosResult.Success -> {
-                        posState.value = app.docsService.currentPos
                         isScanning.value = false
                     }
                     is com.tsd.ascanner.data.docs.ScanPosResult.Error -> {
@@ -133,14 +133,13 @@ fun PosScreen(
 					if (skipNextOnResume.value) {
 						skipNextOnResume.value = false
 					} else {
-						val currentFormId = posState.value?.formId ?: app.docsService.currentPos?.formId
+						val currentFormId = pos?.formId ?: app.docsService.currentPos?.formId
 						if (!currentFormId.isNullOrBlank()) {
 							scope.launch {
 								try {
 									posLoading.value = true
 									val fresh = app.docsService.fetchPos(currentFormId, logRequest = true)
 									app.docsService.currentPos = fresh
-									posState.value = fresh
 								} catch (_: Exception) {
 								} finally {
 									posLoading.value = false
@@ -165,12 +164,11 @@ fun PosScreen(
 		while (true) {
 			kotlinx.coroutines.delay(5000)
 			if (!posLoading.value && !isRequesting.value) {
-				val currentFormId = posState.value?.formId ?: app.docsService.currentPos?.formId
+				val currentFormId = pos?.formId ?: app.docsService.currentPos?.formId
 				if (!currentFormId.isNullOrBlank()) {
 					try {
 						val fresh = app.docsService.fetchPos(currentFormId, logRequest = false)
 						app.docsService.currentPos = fresh
-						posState.value = fresh
 					} catch (_: Exception) {
 					}
 				}
@@ -244,14 +242,13 @@ fun PosScreen(
                     ) {
                         Button(
                             onClick = {
-                            val currentFormId = posState.value?.formId ?: app.docsService.currentPos?.formId
+                            val currentFormId = pos?.formId ?: app.docsService.currentPos?.formId
                             if (!currentFormId.isNullOrBlank()) {
                                 scope.launch {
                                     try {
                                         posLoading.value = true
                                         val fresh = app.docsService.fetchPos(currentFormId, logRequest = true)
                                         app.docsService.currentPos = fresh
-                                        posState.value = fresh
                                     } catch (e: Exception) {
 										if (e !is ServerDialogShownException) {
 											ErrorBus.emit(e.message ?: "Ошибка запроса")
@@ -476,7 +473,7 @@ fun PosScreen(
                 confirmButton = {
                     TextButton(
                         onClick = {
-                            val currentFormId = posState.value?.formId ?: app.docsService.currentPos?.formId
+                            val currentFormId = pos?.formId ?: app.docsService.currentPos?.formId
                             if (currentFormId.isNullOrBlank()) {
                                 showDeleteAll.value = false
                                 return@TextButton
@@ -486,7 +483,6 @@ fun PosScreen(
                                     isRequesting.value = true
                                     when (val res = app.docsService.deletePosAll(currentFormId)) {
                                         is com.tsd.ascanner.data.docs.ScanPosResult.Success -> {
-                                            posState.value = app.docsService.currentPos
                                         }
                                         is com.tsd.ascanner.data.docs.ScanPosResult.Error -> {
                                             ErrorBus.emit(res.message)
@@ -521,7 +517,7 @@ fun PosScreen(
                 confirmButton = {
                     TextButton(
                         onClick = {
-                            val currentFormId = posState.value?.formId ?: app.docsService.currentPos?.formId
+                            val currentFormId = pos?.formId ?: app.docsService.currentPos?.formId
                             if (currentFormId.isNullOrBlank()) {
                                 pendingDeleteItemId.value = null
                                 return@TextButton
@@ -531,7 +527,6 @@ fun PosScreen(
                                     isRequesting.value = true
                                     when (val res = app.docsService.deletePosItem(currentFormId, toDeleteId)) {
                                         is com.tsd.ascanner.data.docs.ScanPosResult.Success -> {
-                                            posState.value = app.docsService.currentPos
                                         }
                                         is com.tsd.ascanner.data.docs.ScanPosResult.Error -> {
                                             ErrorBus.emit(res.message)

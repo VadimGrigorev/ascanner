@@ -54,6 +54,7 @@ import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.launch
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.window.DialogProperties
+import androidx.compose.material3.CircularProgressIndicator
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -210,19 +211,33 @@ class MainActivity : ComponentActivity() {
 											TextButton(
 												enabled = !dialogSending,
 												onClick = {
-													// Close current dialog immediately to avoid double taps
-													globalDialog = null
+													val clickedDialog = dlg
 													dialogSending = true
 													if (b.id.isBlank()) {
+														// Local OK/close button
+														if (globalDialog === clickedDialog) {
+															globalDialog = null
+														}
 														dialogSending = false
 														return@TextButton
 													}
 													scope.launch {
 														try {
 															when (val res = app.docsService.sendButton(dlg.form, dlg.formId, b.id)) {
-																is com.tsd.ascanner.data.docs.ButtonResult.Success -> Unit
-																is com.tsd.ascanner.data.docs.ButtonResult.DialogShown -> Unit
+																is com.tsd.ascanner.data.docs.ButtonResult.Success -> {
+																	// Close only if this is still the same dialog (avoid dismissing a newly arrived one)
+																	if (globalDialog === clickedDialog) {
+																		globalDialog = null
+																	}
+																}
+																is com.tsd.ascanner.data.docs.ButtonResult.DialogShown -> {
+																	// Next dialog will be shown via DialogBus; don't dismiss here to avoid races.
+																}
 																is com.tsd.ascanner.data.docs.ButtonResult.Error -> {
+																	// User chose: close dialog on error and show banner
+																	if (globalDialog === clickedDialog) {
+																		globalDialog = null
+																	}
 																	ErrorBus.emit(res.message)
 																}
 															}
@@ -238,6 +253,16 @@ class MainActivity : ComponentActivity() {
 									}
 								}
 							)
+
+							// Center-screen spinner while dialog button request is in-flight
+							if (dialogSending) {
+								Box(modifier = Modifier.fillMaxSize()) {
+									CircularProgressIndicator(
+										modifier = Modifier.align(Alignment.Center),
+										color = Color(0xFF30323D)
+									)
+								}
+							}
 						}
                     }
                 }

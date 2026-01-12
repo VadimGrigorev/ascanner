@@ -24,6 +24,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material.icons.outlined.PhotoCamera
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.mutableStateOf
@@ -68,8 +69,7 @@ fun DocScreen(
     val ctx = androidx.compose.ui.platform.LocalContext.current
     val app = ctx.applicationContext as AScannerApp
     val docsService = app.docsService
-    val docState = remember { mutableStateOf(docsService.currentDoc) }
-    val doc = docState.value
+	val doc by docsService.currentDocFlow.collectAsState()
     val colors = AppTheme.colors
     val scope = rememberCoroutineScope()
     val errorMessage = remember { mutableStateOf<String?>(null) }
@@ -83,7 +83,7 @@ fun DocScreen(
     val listState = rememberLazyListState()
 
     fun handleScan(code: String) {
-        val currentFormId = docState.value?.formId ?: docsService.currentDoc?.formId
+        val currentFormId = doc?.formId ?: docsService.currentDoc?.formId
         if (code.length < 4 || currentFormId.isNullOrBlank()) return
         lastScan.value = code
         scanError.value = null
@@ -92,7 +92,6 @@ fun DocScreen(
                 isRequesting.value = true
                 when (val res = docsService.scanMark(currentFormId, code)) {
                     is com.tsd.ascanner.data.docs.ScanDocResult.Success -> {
-                        docState.value = docsService.currentDoc
                         isScanning.value = false
                     }
                     is com.tsd.ascanner.data.docs.ScanDocResult.Error -> {
@@ -136,7 +135,6 @@ fun DocScreen(
         try {
             val fresh = docsService.fetchDoc(formId, logRequest = true)
             docsService.currentDoc = fresh
-            docState.value = fresh
         } catch (_: Exception) {
             // error will be surfaced if user tries to refresh or through separate UI
         } finally {
@@ -191,7 +189,6 @@ fun DocScreen(
                                 globalLoading.value = true
                                 val fresh = docsService.fetchDoc(formId, logRequest = true)
                                 docsService.currentDoc = fresh
-                                docState.value = fresh
                             } catch (_: Exception) {
                             } finally {
                                 globalLoading.value = false
@@ -213,7 +210,6 @@ fun DocScreen(
 				try {
 					val fresh = docsService.fetchDoc(formId, logRequest = false)
 					docsService.currentDoc = fresh
-					docState.value = fresh
 				} catch (_: Exception) {
 				}
 			}
@@ -430,7 +426,6 @@ fun DocScreen(
                                     globalLoading.value = true
                                     val fresh = docsService.fetchDoc(formId, logRequest = true)
                                     docsService.currentDoc = fresh
-                                    docState.value = fresh
                                 } catch (_: Exception) {
                                 } finally { globalLoading.value = false }
                             }

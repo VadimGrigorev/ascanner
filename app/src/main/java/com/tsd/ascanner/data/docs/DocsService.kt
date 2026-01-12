@@ -4,15 +4,38 @@ import com.tsd.ascanner.data.auth.AuthService
 import com.tsd.ascanner.data.net.ApiClient
 import com.google.gson.Gson
 import com.tsd.ascanner.utils.ServerDialogShownException
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asStateFlow
 
 class DocsService(
     private val apiClient: ApiClient,
     private val authService: AuthService
 ) {
-    @Volatile
-    var currentDoc: DocOneResponse? = null
-    @Volatile
-    var currentPos: PosResponse? = null
+	private val _currentDoc = MutableStateFlow<DocOneResponse?>(null)
+	val currentDocFlow = _currentDoc.asStateFlow()
+
+	/**
+	 * Backward-compatible imperative accessors.
+	 * Prefer [currentDocFlow] in UI for reactive updates.
+	 */
+	var currentDoc: DocOneResponse?
+		get() = _currentDoc.value
+		set(value) {
+			_currentDoc.value = value
+		}
+
+	private val _currentPos = MutableStateFlow<PosResponse?>(null)
+	val currentPosFlow = _currentPos.asStateFlow()
+
+	/**
+	 * Backward-compatible imperative accessors.
+	 * Prefer [currentPosFlow] in UI for reactive updates.
+	 */
+	var currentPos: PosResponse?
+		get() = _currentPos.value
+		set(value) {
+			_currentPos.value = value
+		}
 
     suspend fun fetchDocs(logRequest: Boolean): DocListResponse {
         val bearer = authService.bearer ?: throw IllegalStateException("Нет токена авторизации")
