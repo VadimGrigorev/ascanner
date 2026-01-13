@@ -185,9 +185,9 @@ class DocsService(
         return ScanPosResult.Success(pos)
     }
 
-	suspend fun sendButton(form: String, formId: String, buttonId: String): ButtonResult {
+	suspend fun sendButton(form: String, formId: String, buttonId: String, requestType: String = "dialog"): ButtonResult {
 		val bearer = authService.bearer ?: return ButtonResult.Error("Нет токена авторизации")
-		val req = ButtonRequest(bearer = bearer, form = form, formId = formId, buttonId = buttonId)
+		val req = ButtonRequest(bearer = bearer, form = form, formId = formId, request = requestType, buttonId = buttonId)
 		return try {
 			val element = apiClient.postForJsonElement("/button", req, logRequest = true)
 			if (!element.isJsonObject) return ButtonResult.Success

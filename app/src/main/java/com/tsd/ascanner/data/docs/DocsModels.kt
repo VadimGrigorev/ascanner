@@ -2,6 +2,13 @@ package com.tsd.ascanner.data.docs
 
 import com.google.gson.annotations.SerializedName
 
+data class ActionButtonDto(
+	@SerializedName("Id") val id: String,
+	@SerializedName("Name") val name: String? = null,
+	@SerializedName("Icon") val icon: String? = null,   // e.g. "icons.outlined.add"
+	@SerializedName("Color") val color: String? = null  // hex without '#', e.g. "008F00"
+)
+
 data class DocListRequest(
     @SerializedName("Bearer") val bearer: String,
     @SerializedName("Form") val form: String = "doclist",
@@ -10,7 +17,8 @@ data class DocListRequest(
 )
 
 data class DocListResponse(
-    @SerializedName("Tasks") val tasks: List<TaskDto> = emptyList()
+    @SerializedName("Tasks") val tasks: List<TaskDto> = emptyList(),
+	@SerializedName("Buttons") val buttons: List<ActionButtonDto> = emptyList()
 )
 
 data class TaskDto(
@@ -43,7 +51,8 @@ data class DocOneResponse(
     @SerializedName("HeaderText") val headerText: String? = null,
     @SerializedName("StatusText") val statusText: String? = null,
     @SerializedName("Status") val status: String? = null,
-    @SerializedName("Items") val items: List<DocItemDto> = emptyList()
+    @SerializedName("Items") val items: List<DocItemDto> = emptyList(),
+	@SerializedName("Buttons") val buttons: List<ActionButtonDto> = emptyList()
 )
 
 data class DocOneRequest(
@@ -89,7 +98,8 @@ data class PosResponse(
     @SerializedName("HeaderText") val headerText: String? = null,
     @SerializedName("StatusText") val statusText: String? = null,
     @SerializedName("Status") val status: String? = null,
-    @SerializedName("Items") val items: List<PosItemDto> = emptyList()
+    @SerializedName("Items") val items: List<PosItemDto> = emptyList(),
+	@SerializedName("Buttons") val buttons: List<ActionButtonDto> = emptyList()
 )
 
 data class PosItemDto(

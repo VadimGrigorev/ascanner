@@ -58,6 +58,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import com.tsd.ascanner.utils.DebugFlags
 import com.tsd.ascanner.utils.DebugSession
+import com.tsd.ascanner.ui.components.ServerActionButtons
 
 @Composable
 fun DocScreen(
@@ -416,6 +417,37 @@ fun DocScreen(
             horizontalAlignment = Alignment.End,
             verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(12.dp)
         ) {
+			var serverSending by remember { mutableStateOf(false) }
+			val serverButtons = doc?.buttons.orEmpty()
+			if (serverButtons.isNotEmpty()) {
+				ServerActionButtons(
+					buttons = serverButtons,
+					enabled = !serverSending,
+					onClick = { b ->
+						val fid = doc?.formId ?: formId
+						if (!fid.isNullOrBlank()) {
+							scope.launch {
+								try {
+									serverSending = true
+									when (val res = docsService.sendButton(form = "doc", formId = fid, buttonId = b.id, requestType = "button")) {
+										is com.tsd.ascanner.data.docs.ButtonResult.Success -> {
+											// state updated via docsService
+										}
+										is com.tsd.ascanner.data.docs.ButtonResult.DialogShown -> {
+											// Dialog shown via DialogBus
+										}
+										is com.tsd.ascanner.data.docs.ButtonResult.Error -> {
+											ErrorBus.emit(res.message)
+										}
+									}
+								} finally {
+									serverSending = false
+								}
+							}
+						}
+					}
+				)
+			}
             if (DebugFlags.REFRESH_BUTTONS_ENABLED) {
                 FloatingActionButton(
                     onClick = {

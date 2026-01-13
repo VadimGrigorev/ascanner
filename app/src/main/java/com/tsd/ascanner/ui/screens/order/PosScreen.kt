@@ -30,6 +30,7 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.tsd.ascanner.AScannerApp
@@ -63,6 +64,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import com.tsd.ascanner.utils.DebugFlags
 import com.tsd.ascanner.utils.DebugSession
+import com.tsd.ascanner.ui.components.ServerActionButtons
 
 @Composable
 fun PosScreen(
@@ -447,22 +449,57 @@ fun PosScreen(
             )
         }
 
-        if (DebugFlags.CAMERA_SCAN_ENABLED && DebugSession.debugModeEnabled) {
-            Column(
-                modifier = Modifier
-                    .align(Alignment.BottomEnd)
-                    .padding(16.dp),
-                horizontalAlignment = Alignment.End
-            ) {
-                FloatingActionButton(
-                    onClick = { showCamera.value = true },
-                    containerColor = colors.secondary,
-                    contentColor = colors.textPrimary
-                ) {
-                    Icon(imageVector = Icons.Outlined.PhotoCamera, contentDescription = "Сканировать камерой")
-                }
-            }
-        }
+		// Bottom-right actions column: server buttons (above) and camera (below if enabled)
+		run {
+			Column(
+				modifier = Modifier
+					.align(Alignment.BottomEnd)
+					.padding(16.dp),
+				horizontalAlignment = Alignment.End,
+				verticalArrangement = Arrangement.spacedBy(12.dp)
+			) {
+				var serverSending by remember { mutableStateOf(false) }
+				val serverButtons = pos?.buttons.orEmpty()
+				if (serverButtons.isNotEmpty()) {
+					ServerActionButtons(
+						buttons = serverButtons,
+						enabled = !serverSending,
+						onClick = { b ->
+							val fid = pos?.formId ?: app.docsService.currentPos?.formId
+							if (!fid.isNullOrBlank()) {
+								scope.launch {
+									try {
+										serverSending = true
+										when (val res = app.docsService.sendButton(form = "pos", formId = fid, buttonId = b.id, requestType = "button")) {
+											is com.tsd.ascanner.data.docs.ButtonResult.Success -> {
+												// state updated via docsService
+											}
+											is com.tsd.ascanner.data.docs.ButtonResult.DialogShown -> {
+												// Dialog shown via DialogBus
+											}
+											is com.tsd.ascanner.data.docs.ButtonResult.Error -> {
+												ErrorBus.emit(res.message)
+											}
+										}
+									} finally {
+										serverSending = false
+									}
+								}
+							}
+						}
+					)
+				}
+				if (DebugFlags.CAMERA_SCAN_ENABLED && DebugSession.debugModeEnabled) {
+					FloatingActionButton(
+						onClick = { showCamera.value = true },
+						containerColor = colors.secondary,
+						contentColor = colors.textPrimary
+					) {
+						Icon(imageVector = Icons.Outlined.PhotoCamera, contentDescription = "Сканировать камерой")
+					}
+				}
+			}
+		}
 
         // Confirm: delete all
         if (showDeleteAll.value) {
