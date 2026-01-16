@@ -151,6 +151,11 @@ class ApiClient(
 					val header = if (obj.has("DialogHeader")) obj.get("DialogHeader").asString else ""
 					val text = if (obj.has("DialogText")) obj.get("DialogText").asString else ""
 					val status = if (obj.has("Status")) obj.get("Status").asString else ""
+					val statusColor = when {
+						obj.has("StatusColor") -> obj.get("StatusColor").asString
+						obj.has("statusColor") -> obj.get("statusColor").asString
+						else -> null
+					}
 					val buttons = buildList {
 						if (obj.has("Buttons") && obj.get("Buttons").isJsonArray) {
 							for (el in obj.getAsJsonArray("Buttons")) {
@@ -169,6 +174,7 @@ class ApiClient(
 							header = header,
 							text = text,
 							status = status,
+							statusColor = statusColor,
 							buttons = buttons
 						)
 					)

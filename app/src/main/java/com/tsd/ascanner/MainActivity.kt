@@ -55,6 +55,7 @@ import kotlinx.coroutines.launch
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.window.DialogProperties
 import androidx.compose.material3.CircularProgressIndicator
+import com.tsd.ascanner.ui.theme.statusCardColor
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -177,13 +178,11 @@ class MainActivity : ComponentActivity() {
 						// Global server-driven dialog (MessageType="dialog")
 						val dlg = globalDialog
 						if (dlg != null) {
-							val bg = when (dlg.status.lowercase()) {
-								"closed" -> appColors.statusDoneBg
-								"pending" -> appColors.statusPendingBg
-								"warning" -> appColors.statusWarningBg
-								"error" -> appColors.statusErrorBg
-								else -> appColors.statusTodoBg
-							}
+							val bg = statusCardColor(
+								colors = appColors,
+								status = dlg.status,
+								statusColor = dlg.statusColor
+							)
 							val fg = if (bg.luminance() < 0.45f) Color.White else Color.Black
 							AlertDialog(
 								onDismissRequest = { /* non-dismissible */ },

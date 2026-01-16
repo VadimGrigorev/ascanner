@@ -65,6 +65,7 @@ import androidx.lifecycle.LifecycleEventObserver
 import com.tsd.ascanner.utils.DebugFlags
 import com.tsd.ascanner.utils.DebugSession
 import com.tsd.ascanner.ui.components.ServerActionButtons
+import com.tsd.ascanner.ui.theme.statusCardColor
 
 @Composable
 fun PosScreen(
@@ -291,26 +292,17 @@ fun PosScreen(
             }
 
 			val itemsList = pos?.items.orEmpty()
-			val stDefault = (pos?.status ?: "").lowercase()
-			val defaultBg = when (stDefault) {
-				"closed" -> colors.statusDoneBg
-				"pending" -> colors.statusPendingBg
-				"warning" -> colors.statusWarningBg
-				"error" -> colors.statusErrorBg
-				else -> colors.statusTodoBg
-			}
             val textColor = colors.textPrimary
             val subColor = colors.textSecondary
 
             items(itemsList) { it ->
-				val stItem = (it.status ?: pos?.status ?: "").lowercase()
-				val itemBg = when (stItem) {
-					"closed" -> colors.statusDoneBg
-					"pending" -> colors.statusPendingBg
-					"warning" -> colors.statusWarningBg
-					"error" -> colors.statusErrorBg
-					else -> defaultBg
-				}
+				val itemBg = statusCardColor(
+					colors = colors,
+					status = it.status,
+					statusColor = it.statusColor,
+					fallbackStatus = pos?.status,
+					fallbackStatusColor = pos?.statusColor
+				)
                 Card(
                     modifier = Modifier
                         .padding(horizontal = 12.dp, vertical = 6.dp)

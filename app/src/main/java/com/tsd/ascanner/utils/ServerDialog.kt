@@ -6,6 +6,7 @@ data class ServerDialog(
 	val header: String,
 	val text: String,
 	val status: String,
+	val statusColor: String? = null,
 	val buttons: List<ServerDialogButton>
 )
 

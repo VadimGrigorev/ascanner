@@ -59,6 +59,7 @@ import androidx.lifecycle.LifecycleEventObserver
 import com.tsd.ascanner.utils.DebugFlags
 import com.tsd.ascanner.utils.DebugSession
 import com.tsd.ascanner.ui.components.ServerActionButtons
+import com.tsd.ascanner.ui.theme.statusCardColor
 
 @Composable
 fun DocScreen(
@@ -276,14 +277,13 @@ fun DocScreen(
 
             val itemsList = doc?.items.orEmpty()
 			items(itemsList) { it ->
-				val st = (it.status ?: "").lowercase()
-				val bg = when (st) {
-					"closed" -> colors.statusDoneBg
-					"pending" -> colors.statusPendingBg
-					"warning" -> colors.statusWarningBg
-					"error" -> colors.statusErrorBg
-					else -> colors.statusTodoBg
-				}
+				val bg = statusCardColor(
+					colors = colors,
+					status = it.status,
+					statusColor = it.statusColor,
+					fallbackStatus = doc?.status,
+					fallbackStatusColor = doc?.statusColor
+				)
 				val textColor = colors.textPrimary
 				val subColor = colors.textSecondary
                 val isLoadingThis = loadingPosId == it.id

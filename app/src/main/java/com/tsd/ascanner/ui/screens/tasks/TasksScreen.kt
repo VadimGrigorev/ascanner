@@ -67,6 +67,7 @@ import androidx.lifecycle.LifecycleEventObserver
 import com.tsd.ascanner.utils.DebugFlags
 import com.tsd.ascanner.utils.DebugSession
 import com.tsd.ascanner.ui.components.ServerActionButtons
+import com.tsd.ascanner.ui.theme.statusCardColor
 
 class TasksViewModel(private val service: DocsService) : ViewModel()
 
@@ -353,12 +354,14 @@ fun TasksScreen(
                 val hasWarning = statuses.any { it == "warning" }
                 val allClosed = totalOrders > 0 && statuses.all { it == "closed" }
                 val hasPending = statuses.any { it == "pending" }
+				val hasNote = statuses.any { it == "note" }
                 val closedCount = statuses.count { it == "closed" }
                 val headerBg = when {
                     hasError -> colors.statusErrorBg
                     hasWarning -> colors.statusWarningBg
                     allClosed -> colors.statusDoneBg
                     hasPending -> colors.statusPendingBg
+					hasNote -> colors.statusNoteBg
                     else -> colors.statusTodoBg
                 }
                 val headerTextColor = colors.textPrimary
@@ -405,14 +408,11 @@ fun TasksScreen(
 
                 if (vm.expandedTaskIds.contains(t.id)) {
                     t.orders.forEach { o ->
-                        val st = (o.status ?: "").lowercase()
-                        val orderBg = when (st) {
-                            "closed" -> colors.statusDoneBg
-                            "pending" -> colors.statusPendingBg
-                            "warning" -> colors.statusWarningBg
-                            "error" -> colors.statusErrorBg
-                            else -> colors.statusTodoBg
-                        }
+                        val orderBg = statusCardColor(
+							colors = colors,
+							status = o.status,
+							statusColor = o.statusColor
+						)
                         val orderTextColor = colors.textPrimary
                         val orderSubTextColor = colors.textSecondary
                         val isLoadingThis = vm.isLoading && loadingOrderId == o.id

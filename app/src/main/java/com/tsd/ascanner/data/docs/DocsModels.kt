@@ -32,6 +32,7 @@ data class OrderDto(
     @SerializedName("Comment 1") val comment1: String? = null,
     @SerializedName("Comment 2") val comment2: String? = null,
     @SerializedName("Status") val status: String? = null,
+	@SerializedName(value = "StatusColor", alternate = ["statusColor"]) val statusColor: String? = null,
     @SerializedName("Id") val id: String
 )
 
@@ -51,6 +52,7 @@ data class DocOneResponse(
     @SerializedName("HeaderText") val headerText: String? = null,
     @SerializedName("StatusText") val statusText: String? = null,
     @SerializedName("Status") val status: String? = null,
+	@SerializedName(value = "StatusColor", alternate = ["statusColor"]) val statusColor: String? = null,
     @SerializedName("Items") val items: List<DocItemDto> = emptyList(),
 	@SerializedName("Buttons") val buttons: List<ActionButtonDto> = emptyList()
 )
@@ -66,7 +68,8 @@ data class DocItemDto(
     @SerializedName("Name") val name: String,
     @SerializedName("Id") val id: String,
     @SerializedName("StatusText") val statusText: String? = null,
-    @SerializedName("Status") val status: String? = null
+    @SerializedName("Status") val status: String? = null,
+	@SerializedName(value = "StatusColor", alternate = ["statusColor"]) val statusColor: String? = null
 )
 
 data class ErrorResponse(
@@ -98,6 +101,7 @@ data class PosResponse(
     @SerializedName("HeaderText") val headerText: String? = null,
     @SerializedName("StatusText") val statusText: String? = null,
     @SerializedName("Status") val status: String? = null,
+	@SerializedName(value = "StatusColor", alternate = ["statusColor"]) val statusColor: String? = null,
     @SerializedName("Items") val items: List<PosItemDto> = emptyList(),
 	@SerializedName("Buttons") val buttons: List<ActionButtonDto> = emptyList()
 )
@@ -107,7 +111,8 @@ data class PosItemDto(
     @SerializedName("Id") val id: String,
     @SerializedName("Text") val text: String? = null,
     @SerializedName("StatusText") val statusText: String? = null,
-    @SerializedName("Status") val status: String? = null
+    @SerializedName("Status") val status: String? = null,
+	@SerializedName(value = "StatusColor", alternate = ["statusColor"]) val statusColor: String? = null
 )
 
 // Delete requests for POS
