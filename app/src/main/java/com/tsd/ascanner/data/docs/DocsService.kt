@@ -43,7 +43,11 @@ class DocsService(
 	private val _navEvents = MutableSharedFlow<NavTarget>(extraBufferCapacity = 16)
 	val navEvents = _navEvents.asSharedFlow()
 
-	private suspend fun routeByForm(obj: JsonObject, fallbackForm: String? = null) {
+	private suspend fun routeByForm(
+		obj: JsonObject,
+		fallbackForm: String? = null,
+		emitNav: Boolean = true
+	) {
 		val respForm = when {
 			obj.has("Form") -> obj.get("Form").asString
 			!fallbackForm.isNullOrBlank() -> fallbackForm
@@ -59,12 +63,16 @@ class DocsService(
 			"doc" -> {
 				val doc = Gson().fromJson(obj, DocOneResponse::class.java)
 				currentDoc = doc
-				_navEvents.emit(NavTarget(form = "doc", formId = doc.formId ?: formId))
+				if (emitNav) {
+					_navEvents.emit(NavTarget(form = "doc", formId = doc.formId ?: formId))
+				}
 			}
 			"pos" -> {
 				val pos = Gson().fromJson(obj, PosResponse::class.java)
 				currentPos = pos
-				_navEvents.emit(NavTarget(form = "pos", formId = pos.formId ?: formId))
+				if (emitNav) {
+					_navEvents.emit(NavTarget(form = "pos", formId = pos.formId ?: formId))
+				}
 			}
 		}
 	}
@@ -75,7 +83,7 @@ class DocsService(
         return apiClient.postAndParse("/docs", req, DocListResponse::class.java, logRequest = logRequest)
     }
 
-    suspend fun fetchDoc(formId: String, logRequest: Boolean): DocOneResponse {
+    suspend fun fetchDoc(formId: String, logRequest: Boolean, emitNav: Boolean = true): DocOneResponse {
         val bearer = authService.bearer ?: throw IllegalStateException("Нет токена авторизации")
         val req = DocOneRequest(bearer = bearer, formId = formId)
 		val element = apiClient.postForJsonElement("/doc", req, logRequest = logRequest)
@@ -85,7 +93,7 @@ class DocsService(
 			// Dialog will be shown via global DialogBus
 			throw ServerDialogShownException()
 		}
-		routeByForm(obj, fallbackForm = "doc")
+		routeByForm(obj, fallbackForm = "doc", emitNav = emitNav)
 		// Backward compatible return type: return a minimal instance if server returned a different Form.
 		return if (obj.has("Form") && obj.get("Form").asString.equals("doc", ignoreCase = true)) {
 			Gson().fromJson(obj, DocOneResponse::class.java)
@@ -107,7 +115,7 @@ class DocsService(
             ?: return ScanDocResult.Error("неверный формат штрихкода")
         return try {
             val doc = fetchDoc(formId, logRequest = true)
-            currentDoc = doc
+            // currentDoc/currentPos are already updated inside fetchDoc() via routeByForm()
             ScanDocResult.Success(doc)
         } catch (_: ServerDialogShownException) {
             // Dialog will be shown via global DialogBus
@@ -140,7 +148,7 @@ class DocsService(
             if (!selectedId.isNullOrBlank()) {
                 try {
                     val doc = fetchDoc(selectedId, logRequest = true)
-                    currentDoc = doc
+                    // currentDoc/currentPos are already updated inside fetchDoc() via routeByForm()
                     ScanDocResult.Success(doc)
                 } catch (_: ServerDialogShownException) {
                     // Dialog will be shown via global DialogBus
@@ -175,7 +183,7 @@ class DocsService(
         return ScanDocResult.Success(returnedDoc)
     }
 
-    suspend fun fetchPos(formId: String, logRequest: Boolean): PosResponse {
+    suspend fun fetchPos(formId: String, logRequest: Boolean, emitNav: Boolean = true): PosResponse {
         val bearer = authService.bearer ?: throw IllegalStateException("Нет токена авторизации")
         val req = PosRequest(bearer = bearer, formId = formId)
 		val element = apiClient.postForJsonElement("/pos", req, logRequest = logRequest)
@@ -185,7 +193,7 @@ class DocsService(
 			// Dialog will be shown via global DialogBus
 			throw ServerDialogShownException()
 		}
-		routeByForm(obj, fallbackForm = "pos")
+		routeByForm(obj, fallbackForm = "pos", emitNav = emitNav)
 		// Backward compatible return type: return a minimal instance if server returned a different Form.
 		return if (obj.has("Form") && obj.get("Form").asString.equals("pos", ignoreCase = true)) {
 			Gson().fromJson(obj, PosResponse::class.java)

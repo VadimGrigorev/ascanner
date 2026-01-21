@@ -96,9 +96,8 @@ class RemoteTasksViewModel(
         errorMessage = null
         viewModelScope.launch {
             try {
-                val doc = docsService.fetchDoc(orderId, logRequest = true)
-                docsService.currentDoc = doc
-                onSuccessOpen()
+                // Server decides which Form to show; navigation happens via DocsService.navEvents in MainActivity.
+                docsService.fetchDoc(orderId, logRequest = true)
             } catch (e: Exception) {
 				if (e !is ServerDialogShownException) {
 					errorMessage = e.message ?: "Ошибка открытия документа"

@@ -141,7 +141,8 @@ fun PosScreen(
 							scope.launch {
 								try {
 									posLoading.value = true
-									app.docsService.fetchPos(currentFormId, logRequest = true)
+									// Background refresh on resume must not change screen
+									app.docsService.fetchPos(currentFormId, logRequest = true, emitNav = false)
 								} catch (_: Exception) {
 								} finally {
 									posLoading.value = false
@@ -169,7 +170,8 @@ fun PosScreen(
 				val currentFormId = pos?.formId ?: app.docsService.currentPos?.formId
 				if (!currentFormId.isNullOrBlank()) {
 					try {
-						app.docsService.fetchPos(currentFormId, logRequest = false)
+						// Background refresh must not change screen
+						app.docsService.fetchPos(currentFormId, logRequest = false, emitNav = false)
 					} catch (_: Exception) {
 					}
 				}

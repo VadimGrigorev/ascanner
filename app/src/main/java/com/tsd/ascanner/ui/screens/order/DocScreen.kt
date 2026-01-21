@@ -187,7 +187,8 @@ fun DocScreen(
                         scope.launch {
                             try {
                                 globalLoading.value = true
-                                docsService.fetchDoc(formId, logRequest = true)
+                                // Background refresh on resume must not change screen
+                                docsService.fetchDoc(formId, logRequest = true, emitNav = false)
                             } catch (_: Exception) {
                             } finally {
                                 globalLoading.value = false
@@ -207,7 +208,8 @@ fun DocScreen(
 			kotlinx.coroutines.delay(5000)
 			if (!globalLoading.value && !isRequesting.value) {
 				try {
-					docsService.fetchDoc(formId, logRequest = false)
+					// Background refresh must not change screen
+					docsService.fetchDoc(formId, logRequest = false, emitNav = false)
 				} catch (_: Exception) {
 				}
 			}

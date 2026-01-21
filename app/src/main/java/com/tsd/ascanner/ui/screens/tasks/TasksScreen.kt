@@ -81,7 +81,9 @@ fun TasksScreen(
     val vm = viewModel<RemoteTasksViewModel>(factory = object : androidx.lifecycle.ViewModelProvider.Factory {
         override fun <T : ViewModel> create(modelClass: Class<T>): T {
             @Suppress("UNCHECKED_CAST")
-            return RemoteTasksViewModel(DocsService(app.apiClient, app.authService)) as T
+            // IMPORTANT: use the shared app.docsService so that MainActivity (which listens to navEvents)
+            // can react to Form-driven navigation triggered by fetchDoc/fetchPos.
+            return RemoteTasksViewModel(app.docsService) as T
         }
     })
 
@@ -423,7 +425,8 @@ fun TasksScreen(
                             .fillMaxWidth()
                             .clickable {
                                 loadingOrderId = o.id
-                                vm.openOrder(o.id) { onOpenDoc(o.id) }
+                                // Navigation is handled globally via DocsService.navEvents based on server Form.
+                                vm.openOrder(o.id) { /* no-op */ }
                             },
                             colors = CardDefaults.cardColors(containerColor = orderContainer)
                         ) {
