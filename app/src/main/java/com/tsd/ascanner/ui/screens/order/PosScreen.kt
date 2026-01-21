@@ -141,8 +141,7 @@ fun PosScreen(
 							scope.launch {
 								try {
 									posLoading.value = true
-									val fresh = app.docsService.fetchPos(currentFormId, logRequest = true)
-									app.docsService.currentPos = fresh
+									app.docsService.fetchPos(currentFormId, logRequest = true)
 								} catch (_: Exception) {
 								} finally {
 									posLoading.value = false
@@ -170,8 +169,7 @@ fun PosScreen(
 				val currentFormId = pos?.formId ?: app.docsService.currentPos?.formId
 				if (!currentFormId.isNullOrBlank()) {
 					try {
-						val fresh = app.docsService.fetchPos(currentFormId, logRequest = false)
-						app.docsService.currentPos = fresh
+						app.docsService.fetchPos(currentFormId, logRequest = false)
 					} catch (_: Exception) {
 					}
 				}
@@ -250,8 +248,7 @@ fun PosScreen(
                                 scope.launch {
                                     try {
                                         posLoading.value = true
-                                        val fresh = app.docsService.fetchPos(currentFormId, logRequest = true)
-                                        app.docsService.currentPos = fresh
+                                        app.docsService.fetchPos(currentFormId, logRequest = true)
                                     } catch (e: Exception) {
 										if (e !is ServerDialogShownException) {
 											ErrorBus.emit(e.message ?: "Ошибка запроса")

@@ -65,8 +65,7 @@ import com.tsd.ascanner.ui.theme.statusCardColor
 fun DocScreen(
     paddingValues: PaddingValues,
     formId: String,
-    onClose: () -> Unit,
-    onOpenPosition: () -> Unit
+    onClose: () -> Unit
 ) {
     val ctx = androidx.compose.ui.platform.LocalContext.current
     val app = ctx.applicationContext as AScannerApp
@@ -135,8 +134,7 @@ fun DocScreen(
     androidx.compose.runtime.LaunchedEffect(formId) {
         globalLoading.value = true
         try {
-            val fresh = docsService.fetchDoc(formId, logRequest = true)
-            docsService.currentDoc = fresh
+            docsService.fetchDoc(formId, logRequest = true)
         } catch (_: Exception) {
             // error will be surfaced if user tries to refresh or through separate UI
         } finally {
@@ -189,8 +187,7 @@ fun DocScreen(
                         scope.launch {
                             try {
                                 globalLoading.value = true
-                                val fresh = docsService.fetchDoc(formId, logRequest = true)
-                                docsService.currentDoc = fresh
+                                docsService.fetchDoc(formId, logRequest = true)
                             } catch (_: Exception) {
                             } finally {
                                 globalLoading.value = false
@@ -210,8 +207,7 @@ fun DocScreen(
 			kotlinx.coroutines.delay(5000)
 			if (!globalLoading.value && !isRequesting.value) {
 				try {
-					val fresh = docsService.fetchDoc(formId, logRequest = false)
-					docsService.currentDoc = fresh
+					docsService.fetchDoc(formId, logRequest = false)
 				} catch (_: Exception) {
 				}
 			}
@@ -305,9 +301,7 @@ fun DocScreen(
                                 try {
                                     loadingPosId = formId
                                     errorMessage.value = null
-                                    val pos = docsService.fetchPos(formId, logRequest = true)
-                                    docsService.currentPos = pos
-                                    onOpenPosition()
+                                    docsService.fetchPos(formId, logRequest = true)
                                 } catch (e: Exception) {
 									if (e !is ServerDialogShownException) {
 										errorMessage.value = e.message ?: "Ошибка загрузки позиции"
@@ -456,8 +450,7 @@ fun DocScreen(
                             scope.launch {
                                 try {
                                     globalLoading.value = true
-                                    val fresh = docsService.fetchDoc(formId, logRequest = true)
-                                    docsService.currentDoc = fresh
+                                    docsService.fetchDoc(formId, logRequest = true)
                                 } catch (_: Exception) {
                                 } finally { globalLoading.value = false }
                             }

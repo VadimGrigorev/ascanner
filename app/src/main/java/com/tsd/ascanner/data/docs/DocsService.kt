@@ -3,8 +3,11 @@ package com.tsd.ascanner.data.docs
 import com.tsd.ascanner.data.auth.AuthService
 import com.tsd.ascanner.data.net.ApiClient
 import com.google.gson.Gson
+import com.google.gson.JsonObject
 import com.tsd.ascanner.utils.ServerDialogShownException
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 
 class DocsService(
@@ -37,6 +40,35 @@ class DocsService(
 			_currentPos.value = value
 		}
 
+	private val _navEvents = MutableSharedFlow<NavTarget>(extraBufferCapacity = 16)
+	val navEvents = _navEvents.asSharedFlow()
+
+	private suspend fun routeByForm(obj: JsonObject, fallbackForm: String? = null) {
+		val respForm = when {
+			obj.has("Form") -> obj.get("Form").asString
+			!fallbackForm.isNullOrBlank() -> fallbackForm
+			else -> ""
+		}.trim()
+
+		val formId = when {
+			obj.has("FormId") -> obj.get("FormId").asString
+			else -> null
+		}
+
+		when (respForm.lowercase()) {
+			"doc" -> {
+				val doc = Gson().fromJson(obj, DocOneResponse::class.java)
+				currentDoc = doc
+				_navEvents.emit(NavTarget(form = "doc", formId = doc.formId ?: formId))
+			}
+			"pos" -> {
+				val pos = Gson().fromJson(obj, PosResponse::class.java)
+				currentPos = pos
+				_navEvents.emit(NavTarget(form = "pos", formId = pos.formId ?: formId))
+			}
+		}
+	}
+
     suspend fun fetchDocs(logRequest: Boolean): DocListResponse {
         val bearer = authService.bearer ?: throw IllegalStateException("Нет токена авторизации")
         val req = DocListRequest(bearer = bearer)
@@ -46,7 +78,20 @@ class DocsService(
     suspend fun fetchDoc(formId: String, logRequest: Boolean): DocOneResponse {
         val bearer = authService.bearer ?: throw IllegalStateException("Нет токена авторизации")
         val req = DocOneRequest(bearer = bearer, formId = formId)
-        return apiClient.postAndParse("/doc", req, DocOneResponse::class.java, logRequest = logRequest)
+		val element = apiClient.postForJsonElement("/doc", req, logRequest = logRequest)
+		val obj = element.asJsonObject
+		val messageType = if (obj.has("MessageType")) obj.get("MessageType").asString else null
+		if (messageType != null && messageType.equals("dialog", ignoreCase = true)) {
+			// Dialog will be shown via global DialogBus
+			throw ServerDialogShownException()
+		}
+		routeByForm(obj, fallbackForm = "doc")
+		// Backward compatible return type: return a minimal instance if server returned a different Form.
+		return if (obj.has("Form") && obj.get("Form").asString.equals("doc", ignoreCase = true)) {
+			Gson().fromJson(obj, DocOneResponse::class.java)
+		} else {
+			DocOneResponse(formId = formId)
+		}
     }
 
     private fun extractFormIdFromScanned(scannedText: String): String? {
@@ -120,15 +165,33 @@ class DocsService(
             val msg = if (obj.has("Message")) obj.get("Message").asString else "Ошибка"
             return ScanDocResult.Error(msg)
         }
-        val doc = Gson().fromJson(obj, DocOneResponse::class.java)
-        currentDoc = doc
-        return ScanDocResult.Success(doc)
+		routeByForm(obj, fallbackForm = "doc")
+		// Close scan overlay even if server returned different Form (navigation is handled globally)
+		val returnedDoc = if (obj.has("Form") && obj.get("Form").asString.equals("doc", ignoreCase = true)) {
+			Gson().fromJson(obj, DocOneResponse::class.java)
+		} else {
+			DocOneResponse(formId = formId)
+		}
+        return ScanDocResult.Success(returnedDoc)
     }
 
     suspend fun fetchPos(formId: String, logRequest: Boolean): PosResponse {
         val bearer = authService.bearer ?: throw IllegalStateException("Нет токена авторизации")
         val req = PosRequest(bearer = bearer, formId = formId)
-        return apiClient.postAndParse("/pos", req, PosResponse::class.java, logRequest = logRequest)
+		val element = apiClient.postForJsonElement("/pos", req, logRequest = logRequest)
+		val obj = element.asJsonObject
+		val messageType = if (obj.has("MessageType")) obj.get("MessageType").asString else null
+		if (messageType != null && messageType.equals("dialog", ignoreCase = true)) {
+			// Dialog will be shown via global DialogBus
+			throw ServerDialogShownException()
+		}
+		routeByForm(obj, fallbackForm = "pos")
+		// Backward compatible return type: return a minimal instance if server returned a different Form.
+		return if (obj.has("Form") && obj.get("Form").asString.equals("pos", ignoreCase = true)) {
+			Gson().fromJson(obj, PosResponse::class.java)
+		} else {
+			PosResponse(formId = formId)
+		}
     }
 
     suspend fun scanPosMark(formId: String, text: String): ScanPosResult {
@@ -144,9 +207,13 @@ class DocsService(
             val msg = if (obj.has("Message")) obj.get("Message").asString else "Ошибка"
             return ScanPosResult.Error(msg)
         }
-        val pos = Gson().fromJson(obj, PosResponse::class.java)
-        currentPos = pos
-        return ScanPosResult.Success(pos)
+		routeByForm(obj, fallbackForm = "pos")
+		val returnedPos = if (obj.has("Form") && obj.get("Form").asString.equals("pos", ignoreCase = true)) {
+			Gson().fromJson(obj, PosResponse::class.java)
+		} else {
+			PosResponse(formId = formId)
+		}
+        return ScanPosResult.Success(returnedPos)
     }
 
     suspend fun deletePosAll(formId: String): ScanPosResult {
@@ -162,9 +229,13 @@ class DocsService(
             val msg = if (obj.has("Message")) obj.get("Message").asString else "Ошибка"
             return ScanPosResult.Error(msg)
         }
-        val pos = Gson().fromJson(obj, PosResponse::class.java)
-        currentPos = pos
-        return ScanPosResult.Success(pos)
+		routeByForm(obj, fallbackForm = "pos")
+		val returnedPos = if (obj.has("Form") && obj.get("Form").asString.equals("pos", ignoreCase = true)) {
+			Gson().fromJson(obj, PosResponse::class.java)
+		} else {
+			PosResponse(formId = formId)
+		}
+        return ScanPosResult.Success(returnedPos)
     }
 
     suspend fun deletePosItem(formId: String, deleteId: String): ScanPosResult {
@@ -180,9 +251,13 @@ class DocsService(
             val msg = if (obj.has("Message")) obj.get("Message").asString else "Ошибка"
             return ScanPosResult.Error(msg)
         }
-        val pos = Gson().fromJson(obj, PosResponse::class.java)
-        currentPos = pos
-        return ScanPosResult.Success(pos)
+		routeByForm(obj, fallbackForm = "pos")
+		val returnedPos = if (obj.has("Form") && obj.get("Form").asString.equals("pos", ignoreCase = true)) {
+			Gson().fromJson(obj, PosResponse::class.java)
+		} else {
+			PosResponse(formId = formId)
+		}
+        return ScanPosResult.Success(returnedPos)
     }
 
 	suspend fun sendButton(form: String, formId: String, buttonId: String, requestType: String = "dialog"): ButtonResult {
@@ -200,17 +275,7 @@ class DocsService(
 				val msg = if (obj.has("Message")) obj.get("Message").asString else "Ошибка"
 				return ButtonResult.Error(msg)
 			}
-			val respForm = if (obj.has("Form")) obj.get("Form").asString else form
-			when (respForm.lowercase()) {
-				"doc" -> {
-					val doc = Gson().fromJson(obj, DocOneResponse::class.java)
-					currentDoc = doc
-				}
-				"pos" -> {
-					val pos = Gson().fromJson(obj, PosResponse::class.java)
-					currentPos = pos
-				}
-			}
+			routeByForm(obj, fallbackForm = form)
 			ButtonResult.Success
 		} catch (e: Exception) {
 			ButtonResult.Error(e.message ?: "Ошибка запроса")
@@ -240,5 +305,10 @@ sealed interface ButtonResult {
 	data class Error(val message: String) : ButtonResult
 	data object DialogShown : ButtonResult
 }
+
+data class NavTarget(
+	val form: String,
+	val formId: String? = null
+)
 
 

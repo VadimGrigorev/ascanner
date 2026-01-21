@@ -103,6 +103,34 @@ class MainActivity : ComponentActivity() {
 						}
 					}
 				}
+				// Global navigation driven by server responses (Form field)
+				LaunchedEffect(Unit) {
+					app.docsService.navEvents.collectLatest { target ->
+						val entry = navController.currentBackStackEntry
+						val route = entry?.destination?.route
+						val currentDocId = entry?.arguments?.getString("formId")?.let { Uri.decode(it) }
+						when (target.form.lowercase()) {
+							"doc" -> {
+								val fid = target.formId
+								if (!fid.isNullOrBlank()) {
+									val alreadyOnSameDoc = route == "doc/{formId}" && currentDocId == fid
+									if (!alreadyOnSameDoc) {
+										navController.navigate("doc/${Uri.encode(fid)}") {
+											launchSingleTop = true
+										}
+									}
+								}
+							}
+							"pos" -> {
+								if (route != "pos") {
+									navController.navigate("pos") {
+										launchSingleTop = true
+									}
+								}
+							}
+						}
+					}
+				}
                 Scaffold(
                     modifier = Modifier.fillMaxSize(),
                     contentWindowInsets = WindowInsets.safeDrawing,
@@ -136,10 +164,7 @@ class MainActivity : ComponentActivity() {
                                 DocScreen(
                                     paddingValues = padding,
                                     formId = formId,
-                                    onClose = { navController.popBackStack() },
-                                    onOpenPosition = {
-                                        navController.navigate("pos")
-                                    }
+                                    onClose = { navController.popBackStack() }
                                 )
                             }
                             composable("pos") {
