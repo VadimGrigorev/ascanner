@@ -66,6 +66,8 @@ import com.tsd.ascanner.utils.DebugFlags
 import com.tsd.ascanner.utils.DebugSession
 import com.tsd.ascanner.ui.components.ServerActionButtons
 import com.tsd.ascanner.ui.theme.statusCardColor
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.platform.LocalDensity
 
 @Composable
 fun PosScreen(
@@ -87,6 +89,8 @@ fun PosScreen(
     val posLoading = remember { mutableStateOf(false) }
     val showCamera = remember { mutableStateOf(false) }
     val listState = rememberLazyListState()
+	var bottomActionsHeightPx by remember { mutableStateOf(0) }
+	val density = LocalDensity.current
     LaunchedEffect(lastScan.value) {
         val hasText = !lastScan.value.isNullOrBlank()
         if (hasText) {
@@ -227,7 +231,19 @@ fun PosScreen(
     }
 
     Box(modifier = Modifier.fillMaxSize().padding(paddingValues)) {
-        LazyColumn(modifier = Modifier.fillMaxSize(), state = listState) {
+		val serverButtons = pos?.buttons.orEmpty()
+		val showCameraFab = DebugFlags.CAMERA_SCAN_ENABLED && DebugSession.debugModeEnabled
+		val hasBottomActions = serverButtons.isNotEmpty() || showCameraFab
+		LaunchedEffect(hasBottomActions) {
+			if (!hasBottomActions) bottomActionsHeightPx = 0
+		}
+		val bottomPaddingDp = with(density) { bottomActionsHeightPx.toDp() } + 8.dp
+
+        LazyColumn(
+			modifier = Modifier.fillMaxSize(),
+			state = listState,
+			contentPadding = PaddingValues(bottom = bottomPaddingDp)
+		) {
             item {
                 Column(modifier = Modifier.padding(12.dp)) {
                     val header = pos?.headerText ?: ""
@@ -441,16 +457,19 @@ fun PosScreen(
         }
 
 		// Bottom-right actions column: server buttons (above) and camera (below if enabled)
-		run {
+		if (hasBottomActions) {
 			Column(
 				modifier = Modifier
 					.align(Alignment.BottomEnd)
-					.padding(16.dp),
+					.padding(16.dp)
+					.onGloballyPositioned { coords ->
+						val h = coords.size.height
+						if (bottomActionsHeightPx != h) bottomActionsHeightPx = h
+					},
 				horizontalAlignment = Alignment.End,
 				verticalArrangement = Arrangement.spacedBy(12.dp)
 			) {
 				var serverSending by remember { mutableStateOf(false) }
-				val serverButtons = pos?.buttons.orEmpty()
 				if (serverButtons.isNotEmpty()) {
 					ServerActionButtons(
 						buttons = serverButtons,
@@ -461,7 +480,12 @@ fun PosScreen(
 								scope.launch {
 									try {
 										serverSending = true
-										when (val res = app.docsService.sendButton(form = "pos", formId = fid, buttonId = b.id, requestType = "button")) {
+										when (val res = app.docsService.sendButton(
+											form = "pos",
+											formId = fid,
+											buttonId = b.id,
+											requestType = "button"
+										)) {
 											is com.tsd.ascanner.data.docs.ButtonResult.Success -> {
 												// state updated via docsService
 											}
@@ -480,7 +504,7 @@ fun PosScreen(
 						}
 					)
 				}
-				if (DebugFlags.CAMERA_SCAN_ENABLED && DebugSession.debugModeEnabled) {
+				if (showCameraFab) {
 					FloatingActionButton(
 						onClick = { showCamera.value = true },
 						containerColor = colors.secondary,

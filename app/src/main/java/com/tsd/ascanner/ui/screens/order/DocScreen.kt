@@ -60,6 +60,8 @@ import com.tsd.ascanner.utils.DebugFlags
 import com.tsd.ascanner.utils.DebugSession
 import com.tsd.ascanner.ui.components.ServerActionButtons
 import com.tsd.ascanner.ui.theme.statusCardColor
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.platform.LocalDensity
 
 @Composable
 fun DocScreen(
@@ -82,6 +84,8 @@ fun DocScreen(
     var loadingPosId by remember { mutableStateOf<String?>(null) }
     var showCamera by remember { mutableStateOf(false) }
     val listState = rememberLazyListState()
+	var bottomActionsHeightPx by remember { mutableStateOf(0) }
+	val density = LocalDensity.current
 
     fun handleScan(code: String) {
         val currentFormId = doc?.formId ?: docsService.currentDoc?.formId
@@ -233,7 +237,20 @@ fun DocScreen(
     }
 
     Box(modifier = Modifier.fillMaxSize().padding(paddingValues)) {
-        LazyColumn(modifier = Modifier.fillMaxSize(), state = listState) {
+		val serverButtons = doc?.buttons.orEmpty()
+		val showRefreshFab = DebugFlags.REFRESH_BUTTONS_ENABLED
+		val showCameraFab = DebugFlags.CAMERA_SCAN_ENABLED && DebugSession.debugModeEnabled
+		val hasBottomActions = serverButtons.isNotEmpty() || showRefreshFab || showCameraFab
+		LaunchedEffect(hasBottomActions) {
+			if (!hasBottomActions) bottomActionsHeightPx = 0
+		}
+		val bottomPaddingDp = with(density) { bottomActionsHeightPx.toDp() } + 8.dp
+
+        LazyColumn(
+			modifier = Modifier.fillMaxSize(),
+			state = listState,
+			contentPadding = PaddingValues(bottom = bottomPaddingDp)
+		) {
             item {
                 Column(modifier = Modifier.padding(12.dp)) {
                     val header = doc?.headerText ?: ""
@@ -406,74 +423,86 @@ fun DocScreen(
             )
         }
 
-        Column(
-            modifier = Modifier
-                .align(Alignment.BottomEnd)
-                .padding(16.dp),
-            horizontalAlignment = Alignment.End,
-            verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(12.dp)
-        ) {
-			var serverSending by remember { mutableStateOf(false) }
-			val serverButtons = doc?.buttons.orEmpty()
-			if (serverButtons.isNotEmpty()) {
-				ServerActionButtons(
-					buttons = serverButtons,
-					enabled = !serverSending,
-					onClick = { b ->
-						val fid = doc?.formId ?: formId
-						if (!fid.isNullOrBlank()) {
-							scope.launch {
-								try {
-									serverSending = true
-									when (val res = docsService.sendButton(form = "doc", formId = fid, buttonId = b.id, requestType = "button")) {
-										is com.tsd.ascanner.data.docs.ButtonResult.Success -> {
-											// state updated via docsService
+		if (hasBottomActions) {
+			Column(
+				modifier = Modifier
+					.align(Alignment.BottomEnd)
+					.padding(16.dp)
+					.onGloballyPositioned { coords ->
+						val h = coords.size.height
+						if (bottomActionsHeightPx != h) bottomActionsHeightPx = h
+					},
+				horizontalAlignment = Alignment.End,
+				verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(12.dp)
+			) {
+				var serverSending by remember { mutableStateOf(false) }
+				if (serverButtons.isNotEmpty()) {
+					ServerActionButtons(
+						buttons = serverButtons,
+						enabled = !serverSending,
+						onClick = { b ->
+							val fid = doc?.formId ?: formId
+							if (!fid.isNullOrBlank()) {
+								scope.launch {
+									try {
+										serverSending = true
+										when (val res = docsService.sendButton(
+											form = "doc",
+											formId = fid,
+											buttonId = b.id,
+											requestType = "button"
+										)) {
+											is com.tsd.ascanner.data.docs.ButtonResult.Success -> {
+												// state updated via docsService
+											}
+											is com.tsd.ascanner.data.docs.ButtonResult.DialogShown -> {
+												// Dialog shown via DialogBus
+											}
+											is com.tsd.ascanner.data.docs.ButtonResult.Error -> {
+												ErrorBus.emit(res.message)
+											}
 										}
-										is com.tsd.ascanner.data.docs.ButtonResult.DialogShown -> {
-											// Dialog shown via DialogBus
-										}
-										is com.tsd.ascanner.data.docs.ButtonResult.Error -> {
-											ErrorBus.emit(res.message)
-										}
+									} finally {
+										serverSending = false
 									}
-								} finally {
-									serverSending = false
 								}
 							}
 						}
+					)
+				}
+				if (showRefreshFab) {
+					FloatingActionButton(
+						onClick = {
+							val formId = doc?.formId
+							if (!formId.isNullOrBlank()) {
+								scope.launch {
+									try {
+										globalLoading.value = true
+										docsService.fetchDoc(formId, logRequest = true)
+									} catch (_: Exception) {
+									} finally {
+										globalLoading.value = false
+									}
+								}
+							}
+						},
+						containerColor = colors.secondary,
+						contentColor = colors.textPrimary
+					) {
+						Icon(imageVector = Icons.Outlined.Refresh, contentDescription = "Обновить")
 					}
-				)
+				}
+				if (showCameraFab) {
+					FloatingActionButton(
+						onClick = { showCamera = true },
+						containerColor = colors.secondary,
+						contentColor = colors.textPrimary
+					) {
+						Icon(imageVector = Icons.Outlined.PhotoCamera, contentDescription = "Сканировать камерой")
+					}
+				}
 			}
-            if (DebugFlags.REFRESH_BUTTONS_ENABLED) {
-                FloatingActionButton(
-                    onClick = {
-                        val formId = doc?.formId
-                        if (!formId.isNullOrBlank()) {
-                            scope.launch {
-                                try {
-                                    globalLoading.value = true
-                                    docsService.fetchDoc(formId, logRequest = true)
-                                } catch (_: Exception) {
-                                } finally { globalLoading.value = false }
-                            }
-                        }
-                    },
-                    containerColor = colors.secondary,
-                    contentColor = colors.textPrimary
-                ) {
-                    Icon(imageVector = Icons.Outlined.Refresh, contentDescription = "Обновить")
-                }
-            }
-            if (DebugFlags.CAMERA_SCAN_ENABLED && DebugSession.debugModeEnabled) {
-                FloatingActionButton(
-                    onClick = { showCamera = true },
-                    containerColor = colors.secondary,
-                    contentColor = colors.textPrimary
-                ) {
-                    Icon(imageVector = Icons.Outlined.PhotoCamera, contentDescription = "Сканировать камерой")
-                }
-            }
-        }
+		}
 
         if (DebugFlags.CAMERA_SCAN_ENABLED && DebugSession.debugModeEnabled) {
             com.tsd.ascanner.ui.components.CameraScannerOverlay(

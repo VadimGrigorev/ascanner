@@ -51,6 +51,8 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.platform.LocalDensity
 import kotlinx.coroutines.launch
 import android.content.BroadcastReceiver
 import android.content.Context
@@ -96,6 +98,8 @@ fun TasksScreen(
     var loadingOrderId by remember { mutableStateOf<String?>(null) }
 	var searchFocused by remember { mutableStateOf(false) }
     var showCamera by remember { mutableStateOf(false) }
+	var bottomActionsHeightPx by remember { mutableStateOf(0) }
+	val density = LocalDensity.current
 
     fun commitScan(code: String) {
         if (code.length < 4) return
@@ -208,6 +212,15 @@ fun TasksScreen(
     }
 
     Box(modifier = Modifier.fillMaxSize().padding(paddingValues)) {
+		val serverButtons = vm.buttons
+		val showRefreshFab = DebugFlags.REFRESH_BUTTONS_ENABLED
+		val showCameraFab = DebugFlags.CAMERA_SCAN_ENABLED && DebugSession.debugModeEnabled
+		val hasBottomActions = serverButtons.isNotEmpty() || showRefreshFab || showCameraFab
+		LaunchedEffect(hasBottomActions) {
+			if (!hasBottomActions) bottomActionsHeightPx = 0
+		}
+		val bottomPaddingDp = with(density) { bottomActionsHeightPx.toDp() } + 8.dp
+
         // Always-on hidden input to catch wedge text even without overlay
         AndroidView(
             factory = { ctx ->
@@ -270,7 +283,10 @@ fun TasksScreen(
 			update = { v -> v.post { if (!searchFocused) v.requestFocus() } }
         )
 
-        LazyColumn(modifier = Modifier.fillMaxSize()) {
+        LazyColumn(
+			modifier = Modifier.fillMaxSize(),
+			contentPadding = PaddingValues(bottom = bottomPaddingDp)
+		) {
             // Header: filter and errors
             item {
                 Column(modifier = Modifier.padding(12.dp)) {
@@ -470,61 +486,71 @@ fun TasksScreen(
             }
         }
 
-        Column(
-            modifier = Modifier
-                .align(Alignment.BottomEnd)
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-            horizontalAlignment = Alignment.End
-        ) {
-			val serverButtons = vm.buttons
-			var serverSending by remember { mutableStateOf(false) }
-			if (serverButtons.isNotEmpty()) {
-				ServerActionButtons(
-					buttons = serverButtons,
-					enabled = !serverSending,
-					onClick = { b ->
-						val buttonId = b.id
-						serverSending = true
-						scope.launch {
-							try {
-								when (val res = app.docsService.sendButton(form = "doclist", formId = "", buttonId = buttonId, requestType = "button")) {
-									is com.tsd.ascanner.data.docs.ButtonResult.Success -> {
-										vm.refresh(userInitiated = false)
+		if (hasBottomActions) {
+			Column(
+				modifier = Modifier
+					.align(Alignment.BottomEnd)
+					.padding(16.dp)
+					.onGloballyPositioned { coords ->
+						val h = coords.size.height
+						if (bottomActionsHeightPx != h) bottomActionsHeightPx = h
+					},
+				verticalArrangement = Arrangement.spacedBy(12.dp),
+				horizontalAlignment = Alignment.End
+			) {
+				var serverSending by remember { mutableStateOf(false) }
+				if (serverButtons.isNotEmpty()) {
+					ServerActionButtons(
+						buttons = serverButtons,
+						enabled = !serverSending,
+						onClick = { b ->
+							val buttonId = b.id
+							serverSending = true
+							scope.launch {
+								try {
+									when (val res = app.docsService.sendButton(
+										form = "doclist",
+										formId = "",
+										buttonId = buttonId,
+										requestType = "button"
+									)) {
+										is com.tsd.ascanner.data.docs.ButtonResult.Success -> {
+											vm.refresh(userInitiated = false)
+										}
+										is com.tsd.ascanner.data.docs.ButtonResult.DialogShown -> {
+											// Dialog will be shown via DialogBus
+										}
+										is com.tsd.ascanner.data.docs.ButtonResult.Error -> {
+											ErrorBus.emit(res.message)
+										}
 									}
-									is com.tsd.ascanner.data.docs.ButtonResult.DialogShown -> {
-										// Dialog will be shown via DialogBus
-									}
-									is com.tsd.ascanner.data.docs.ButtonResult.Error -> {
-										ErrorBus.emit(res.message)
-									}
+								} finally {
+									serverSending = false
 								}
-							} finally {
-								serverSending = false
 							}
 						}
+					)
+				}
+				if (showRefreshFab) {
+					FloatingActionButton(
+						onClick = { vm.refresh() },
+						containerColor = colors.secondary,
+						contentColor = colors.textPrimary
+					) {
+						Icon(imageVector = Icons.Outlined.Refresh, contentDescription = "Обновить")
 					}
-				)
+				}
+				if (showCameraFab) {
+					FloatingActionButton(
+						onClick = { showCamera = true },
+						containerColor = colors.secondary,
+						contentColor = colors.textPrimary
+					) {
+						Icon(imageVector = Icons.Outlined.PhotoCamera, contentDescription = "Сканировать камерой")
+					}
+				}
 			}
-            if (DebugFlags.REFRESH_BUTTONS_ENABLED) {
-                FloatingActionButton(
-                    onClick = { vm.refresh() },
-                    containerColor = colors.secondary,
-                    contentColor = colors.textPrimary
-                ) {
-                    Icon(imageVector = Icons.Outlined.Refresh, contentDescription = "Обновить")
-                }
-            }
-            if (DebugFlags.CAMERA_SCAN_ENABLED && DebugSession.debugModeEnabled) {
-                FloatingActionButton(
-                    onClick = { showCamera = true },
-                    containerColor = colors.secondary,
-                    contentColor = colors.textPrimary
-                ) {
-                    Icon(imageVector = Icons.Outlined.PhotoCamera, contentDescription = "Сканировать камерой")
-                }
-            }
-        }
+		}
 
         // Camera overlay
         if (DebugFlags.CAMERA_SCAN_ENABLED && DebugSession.debugModeEnabled) {
