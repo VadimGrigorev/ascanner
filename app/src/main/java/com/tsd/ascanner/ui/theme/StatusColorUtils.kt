@@ -22,7 +22,8 @@ fun parseHexColorOrNull(raw: String?): Color? {
  * Choose card/background color for a status.
  * - If [statusColor] is present and valid, it wins.
  * - Otherwise uses known status mapping.
- * - If status is unknown/blank, optional fallback can be used (e.g. pos-level defaults).
+ * - If [status] is present, its mapping wins (including "open" -> todo/blue).
+ * - If [status] is blank, optional fallback can be used (e.g. doc-level defaults).
  */
 fun statusCardColor(
 	colors: AppColors,
@@ -33,18 +34,23 @@ fun statusCardColor(
 ): Color {
 	parseHexColorOrNull(statusColor)?.let { return it }
 
-	fun mapStatus(s: String?): Color? = when ((s ?: "").trim().lowercase()) {
+	fun mapKnownStatusOrNull(s: String?): Color? = when ((s ?: "").trim().lowercase()) {
 		"closed" -> colors.statusDoneBg
 		"pending" -> colors.statusPendingBg
 		"note" -> colors.statusNoteBg
 		"warning" -> colors.statusWarningBg
 		"error" -> colors.statusErrorBg
-		// "open" and anything else -> null (handled by fallback / default)
+		"open" -> colors.statusTodoBg
 		else -> null
 	}
 
-	mapStatus(status)?.let { return it }
+	// If item has its own status, never inherit doc/pos status.
+	if (!status.isNullOrBlank()) {
+		return mapKnownStatusOrNull(status) ?: colors.statusTodoBg
+	}
+
+	// No item status -> inherit from provided fallback (doc/pos)
 	parseHexColorOrNull(fallbackStatusColor)?.let { return it }
-	return mapStatus(fallbackStatus) ?: colors.statusTodoBg
+	return mapKnownStatusOrNull(fallbackStatus) ?: colors.statusTodoBg
 }
 
