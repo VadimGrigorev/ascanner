@@ -439,7 +439,7 @@ class TscPrinterService(private val context: Context) {
      * 
      * The bitmap is scaled to label size and converted to 1-bit per pixel format.
      * Each byte contains 8 horizontal pixels (MSB first).
-     * Pixel value: 1 = black (print), 0 = white (no print)
+     * Pixel value (for this printer/TSPL BITMAP): 0 = black (print), 1 = white (no print)
      * 
      * @param bitmap Source bitmap (any size, will be scaled)
      * @return ByteArray in 1-bit monochrome format
@@ -469,8 +469,9 @@ class TscPrinterService(private val context: Context) {
                 val b = Color.blue(pixel)
                 val luminance = (0.299 * r + 0.587 * g + 0.114 * b).toInt()
                 
-                // If dark pixel (luminance < 128), set bit to 1 (black/print)
-                if (luminance < 128) {
+                // RE310/TSPL BITMAP data is inverted compared to common assumptions:
+                // set bit to 1 for WHITE pixels (no print). Black stays 0 (print).
+                if (luminance >= 128) {
                     val byteIndex = y * widthBytes + (x / 8)
                     val bitIndex = 7 - (x % 8)  // MSB first
                     result[byteIndex] = (result[byteIndex].toInt() or (1 shl bitIndex)).toByte()
@@ -712,8 +713,8 @@ class TscPrinterService(private val context: Context) {
                 val b = Color.blue(pixel)
                 val luminance = (0.299 * r + 0.587 * g + 0.114 * b).toInt()
                 
-                // If dark pixel (luminance < 128), set bit to 1 (black/print)
-                if (luminance < 128) {
+                // Same inversion as bitmapToMonochrome(): 1 = white (no print), 0 = black (print)
+                if (luminance >= 128) {
                     val byteIndex = y * widthBytes + (x / 8)
                     val bitIndex = 7 - (x % 8)  // MSB first
                     result[byteIndex] = (result[byteIndex].toInt() or (1 shl bitIndex)).toByte()
@@ -753,7 +754,7 @@ class TscPrinterService(private val context: Context) {
             // Calculate dimensions in dots
             val widthDots = (widthMm * DOTS_PER_MM).toInt()
             val heightDots = (heightMm * DOTS_PER_MM).toInt()
-            val widthBytes = widthDots / 8
+            val widthBytes = (widthDots + 7) / 8
             
             // Convert bitmap to monochrome bytes with custom size
             val bitmapData = bitmapToMonochromeWithSize(bitmap, widthDots, heightDots)
