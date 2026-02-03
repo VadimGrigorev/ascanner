@@ -91,12 +91,14 @@ fun PrinterDialog(
     var isLoading by remember { mutableStateOf(false) }
     var printResult by remember { mutableStateOf<String?>(null) }
     var hasPermissions by remember { mutableStateOf(printerService.hasBluetoothPermissions()) }
+	var bluetoothEnabled by remember { mutableStateOf(printerService.isBluetoothEnabled()) }
 
     // Permission launcher
     val permissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestMultiplePermissions()
     ) { permissions ->
         hasPermissions = permissions.values.all { it }
+		bluetoothEnabled = printerService.isBluetoothEnabled()
         if (hasPermissions) {
             pairedDevices = printerService.getPairedDevices()
         }
@@ -119,16 +121,23 @@ fun PrinterDialog(
             }
             permissionLauncher.launch(permissions)
         } else if (visible && hasPermissions) {
+			bluetoothEnabled = printerService.isBluetoothEnabled()
             pairedDevices = printerService.getPairedDevices()
         }
     }
 
-    // Refresh devices list
-    fun refreshDevices() {
-        if (hasPermissions) {
-            pairedDevices = printerService.getPairedDevices()
-        }
-    }
+	// Refresh Bluetooth status + paired devices list.
+	// Important: bluetoothEnabled is Compose state, so the UI can update when Bluetooth is toggled externally.
+	fun refreshDevices() {
+		hasPermissions = printerService.hasBluetoothPermissions()
+		bluetoothEnabled = printerService.isBluetoothEnabled()
+		printerService.clearError()
+		if (hasPermissions && bluetoothEnabled) {
+			pairedDevices = printerService.getPairedDevices()
+		} else {
+			pairedDevices = emptyList()
+		}
+	}
 
     // Connect to device (printing is always manual via button)
     fun connectToDevice(device: BluetoothDevice) {
@@ -367,7 +376,7 @@ fun PrinterDialog(
                                     }
                                 }
                             }
-                        } else if (!printerService.isBluetoothEnabled()) {
+                        } else if (!bluetoothEnabled) {
                             Card(
                                 modifier = Modifier.fillMaxWidth(),
                                 colors = CardDefaults.cardColors(containerColor = Color(0xFFFFEBEE)),
