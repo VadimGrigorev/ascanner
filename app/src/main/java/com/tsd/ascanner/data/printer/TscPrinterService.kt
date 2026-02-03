@@ -55,6 +55,25 @@ class TscPrinterService(private val context: Context) {
         
         // Width in bytes for BITMAP command (width must be divisible by 8)
         const val LABEL_WIDTH_BYTES = LABEL_WIDTH_DOTS / 8  // 50 bytes
+        
+        // SharedPreferences for storing last printer address
+        private const val PREFS_NAME = "printer_settings"
+        private const val KEY_LAST_PRINTER_ADDRESS = "last_printer_address"
+    }
+    
+    // SharedPreferences for persisting printer settings
+    private val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+    
+    /**
+     * Result of a smart print operation
+     */
+    sealed class PrintResult {
+        /** Print was successful */
+        object Success : PrintResult()
+        /** No printer configured or auto-connect failed - need to show printer selection dialog */
+        object NeedPrinterSelection : PrintResult()
+        /** Print failed with an error */
+        data class Error(val message: String) : PrintResult()
     }
 
     private val bluetoothManager: BluetoothManager? = 
@@ -102,6 +121,61 @@ class TscPrinterService(private val context: Context) {
      */
     fun isBluetoothEnabled(): Boolean {
         return bluetoothAdapter?.isEnabled == true
+    }
+    
+    /**
+     * Save the address of the last successfully connected printer
+     */
+    private fun saveLastPrinterAddress(address: String) {
+        prefs.edit().putString(KEY_LAST_PRINTER_ADDRESS, address).apply()
+        Log.d(TAG, "Saved last printer address: $address")
+    }
+    
+    /**
+     * Get the address of the last successfully connected printer
+     */
+    fun getLastPrinterAddress(): String? {
+        return prefs.getString(KEY_LAST_PRINTER_ADDRESS, null)
+    }
+    
+    /**
+     * Try to automatically connect to the last used printer.
+     * 
+     * @return true if already connected or successfully connected to last printer,
+     *         false if no last printer saved, device not found, or connection failed
+     */
+    @SuppressLint("MissingPermission")
+    suspend fun tryAutoConnect(): Boolean {
+        // Already connected - nothing to do
+        if (isConnected()) {
+            Log.d(TAG, "tryAutoConnect: already connected")
+            return true
+        }
+        
+        // Check permissions
+        if (!hasBluetoothPermissions()) {
+            Log.d(TAG, "tryAutoConnect: no Bluetooth permissions")
+            return false
+        }
+        
+        // Get last printer address
+        val lastAddress = getLastPrinterAddress()
+        if (lastAddress.isNullOrBlank()) {
+            Log.d(TAG, "tryAutoConnect: no last printer address saved")
+            return false
+        }
+        
+        Log.d(TAG, "tryAutoConnect: attempting to connect to $lastAddress")
+        
+        // Find the device in paired devices
+        val device = getPairedDevices().find { it.address == lastAddress }
+        if (device == null) {
+            Log.d(TAG, "tryAutoConnect: device $lastAddress not found in paired devices")
+            return false
+        }
+        
+        // Try to connect
+        return connect(device)
     }
 
     /**
@@ -160,6 +234,9 @@ class TscPrinterService(private val context: Context) {
             outputStream = socket.outputStream
             _connectedDevice = device
             _connectionState.value = ConnectionState.CONNECTED
+            
+            // Save this printer as the last used one for auto-connect
+            saveLastPrinterAddress(device.address)
             
             Log.d(TAG, "Connected to ${device.name}")
             true
@@ -491,57 +568,38 @@ class TscPrinterService(private val context: Context) {
         
         val canvas = Canvas(bitmap)
         val paint = Paint().apply {
-            isAntiAlias = true
+            isAntiAlias = false  // Disable anti-aliasing for sharper lines
         }
         
         // Fill with white background
         canvas.drawColor(Color.WHITE)
         
-        // Draw black border
+        // Draw thin corner marks instead of full border (saves ink)
         paint.color = Color.BLACK
         paint.style = Paint.Style.STROKE
-        paint.strokeWidth = 4f
-        canvas.drawRect(2f, 2f, LABEL_WIDTH_DOTS - 2f, LABEL_HEIGHT_DOTS - 2f, paint)
+        paint.strokeWidth = 1f
+        val cornerSize = 20f
+        // Top-left corner
+        canvas.drawLine(0f, 0f, cornerSize, 0f, paint)
+        canvas.drawLine(0f, 0f, 0f, cornerSize, paint)
+        // Top-right corner
+        canvas.drawLine(LABEL_WIDTH_DOTS - cornerSize, 0f, LABEL_WIDTH_DOTS.toFloat(), 0f, paint)
+        canvas.drawLine(LABEL_WIDTH_DOTS - 1f, 0f, LABEL_WIDTH_DOTS - 1f, cornerSize, paint)
+        // Bottom-left corner
+        canvas.drawLine(0f, LABEL_HEIGHT_DOTS - 1f, cornerSize, LABEL_HEIGHT_DOTS - 1f, paint)
+        canvas.drawLine(0f, LABEL_HEIGHT_DOTS - cornerSize, 0f, LABEL_HEIGHT_DOTS.toFloat(), paint)
+        // Bottom-right corner
+        canvas.drawLine(LABEL_WIDTH_DOTS - cornerSize, LABEL_HEIGHT_DOTS - 1f, LABEL_WIDTH_DOTS.toFloat(), LABEL_HEIGHT_DOTS - 1f, paint)
+        canvas.drawLine(LABEL_WIDTH_DOTS - 1f, LABEL_HEIGHT_DOTS - cornerSize, LABEL_WIDTH_DOTS - 1f, LABEL_HEIGHT_DOTS.toFloat(), paint)
         
-        // Draw title text
+        // Draw minimal text
         paint.style = Paint.Style.FILL
-        paint.textSize = 48f
-        paint.typeface = Typeface.DEFAULT_BOLD
-        val title = "TSC RE310"
-        val titleWidth = paint.measureText(title)
-        canvas.drawText(title, (LABEL_WIDTH_DOTS - titleWidth) / 2, 60f, paint)
-        
-        // Draw subtitle
-        paint.textSize = 32f
+        paint.textSize = 28f
         paint.typeface = Typeface.DEFAULT
-        val subtitle = "Bitmap Test"
-        val subtitleWidth = paint.measureText(subtitle)
-        canvas.drawText(subtitle, (LABEL_WIDTH_DOTS - subtitleWidth) / 2, 110f, paint)
         
-        // Draw size info
-        paint.textSize = 24f
-        val sizeInfo = "${LABEL_WIDTH_MM}x${LABEL_HEIGHT_MM} mm"
-        val sizeWidth = paint.measureText(sizeInfo)
-        canvas.drawText(sizeInfo, (LABEL_WIDTH_DOTS - sizeWidth) / 2, 150f, paint)
-        
-        // Draw a small test pattern (checkerboard) at bottom
-        paint.style = Paint.Style.FILL
-        val patternSize = 16
-        val patternStartX = (LABEL_WIDTH_DOTS - patternSize * 10) / 2
-        val patternStartY = 180
-        for (row in 0 until 3) {
-            for (col in 0 until 10) {
-                if ((row + col) % 2 == 0) {
-                    canvas.drawRect(
-                        (patternStartX + col * patternSize).toFloat(),
-                        (patternStartY + row * patternSize).toFloat(),
-                        (patternStartX + (col + 1) * patternSize).toFloat(),
-                        (patternStartY + (row + 1) * patternSize).toFloat(),
-                        paint
-                    )
-                }
-            }
-        }
+        val text = "Test OK"
+        val textWidth = paint.measureText(text)
+        canvas.drawText(text, (LABEL_WIDTH_DOTS - textWidth) / 2, (LABEL_HEIGHT_DOTS + 10) / 2f, paint)
         
         Log.d(TAG, "Created test bitmap: ${bitmap.width}x${bitmap.height}")
         
@@ -552,6 +610,60 @@ class TscPrinterService(private val context: Context) {
         bitmap.recycle()
         
         return result
+    }
+    
+    /**
+     * Smart print a bitmap - automatically connects to last printer if needed.
+     * 
+     * This method tries to:
+     * 1. Use existing connection if available
+     * 2. Auto-connect to last used printer if not connected
+     * 3. Return NeedPrinterSelection if auto-connect fails
+     * 
+     * @param bitmap The bitmap to print
+     * @return PrintResult indicating success, need for printer selection, or error
+     */
+    suspend fun smartPrintBitmap(bitmap: Bitmap): PrintResult {
+        // Try to auto-connect if not connected
+        if (!tryAutoConnect()) {
+            Log.d(TAG, "smartPrintBitmap: auto-connect failed, need printer selection")
+            return PrintResult.NeedPrinterSelection
+        }
+        
+        // Now we're connected - try to print
+        return if (printBitmap(bitmap)) {
+            Log.d(TAG, "smartPrintBitmap: print successful")
+            PrintResult.Success
+        } else {
+            val error = lastError.value ?: "Ошибка печати"
+            Log.e(TAG, "smartPrintBitmap: print failed - $error")
+            PrintResult.Error(error)
+        }
+    }
+    
+    /**
+     * Smart print a test bitmap - automatically connects to last printer if needed.
+     * 
+     * Convenience method that generates a test bitmap and prints it using smartPrintBitmap.
+     * 
+     * @return PrintResult indicating success, need for printer selection, or error
+     */
+    suspend fun smartPrintTestBitmap(): PrintResult {
+        // Try to auto-connect if not connected
+        if (!tryAutoConnect()) {
+            Log.d(TAG, "smartPrintTestBitmap: auto-connect failed, need printer selection")
+            return PrintResult.NeedPrinterSelection
+        }
+        
+        // Now we're connected - try to print test bitmap
+        return if (printTestBitmap()) {
+            Log.d(TAG, "smartPrintTestBitmap: print successful")
+            PrintResult.Success
+        } else {
+            val error = lastError.value ?: "Ошибка печати"
+            Log.e(TAG, "smartPrintTestBitmap: print failed - $error")
+            PrintResult.Error(error)
+        }
     }
     
     /**
