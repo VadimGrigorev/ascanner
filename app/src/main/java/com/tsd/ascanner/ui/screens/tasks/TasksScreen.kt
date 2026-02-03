@@ -30,6 +30,7 @@ import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material.icons.outlined.PhotoCamera
+import androidx.compose.material.icons.outlined.Print
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -69,6 +70,7 @@ import androidx.lifecycle.LifecycleEventObserver
 import com.tsd.ascanner.utils.DebugFlags
 import com.tsd.ascanner.utils.DebugSession
 import com.tsd.ascanner.ui.components.ServerActionButtons
+import com.tsd.ascanner.ui.components.PrinterDialog
 import com.tsd.ascanner.ui.theme.statusCardColor
 
 class TasksViewModel(private val service: DocsService) : ViewModel()
@@ -98,6 +100,7 @@ fun TasksScreen(
     var loadingOrderId by remember { mutableStateOf<String?>(null) }
 	var searchFocused by remember { mutableStateOf(false) }
     var showCamera by remember { mutableStateOf(false) }
+    var showPrinterDialog by remember { mutableStateOf(false) }
 	var bottomActionsHeightPx by remember { mutableStateOf(0) }
 	val density = LocalDensity.current
 
@@ -215,7 +218,8 @@ fun TasksScreen(
 		val serverButtons = vm.buttons
 		val showRefreshFab = DebugFlags.REFRESH_BUTTONS_ENABLED
 		val showCameraFab = DebugFlags.CAMERA_SCAN_ENABLED && DebugSession.debugModeEnabled
-		val hasBottomActions = serverButtons.isNotEmpty() || showRefreshFab || showCameraFab
+		val showPrinterFab = true // Always show printer button
+		val hasBottomActions = serverButtons.isNotEmpty() || showRefreshFab || showCameraFab || showPrinterFab
 		LaunchedEffect(hasBottomActions) {
 			if (!hasBottomActions) bottomActionsHeightPx = 0
 		}
@@ -549,6 +553,14 @@ fun TasksScreen(
 						Icon(imageVector = Icons.Outlined.PhotoCamera, contentDescription = "Сканировать камерой")
 					}
 				}
+				// Printer FAB - always visible
+				FloatingActionButton(
+					onClick = { showPrinterDialog = true },
+					containerColor = colors.secondary,
+					contentColor = colors.textPrimary
+				) {
+					Icon(imageVector = Icons.Outlined.Print, contentDescription = "Принтер")
+				}
 			}
 		}
 
@@ -560,6 +572,12 @@ fun TasksScreen(
                 onClose = { showCamera = false }
             )
         }
+
+        // Printer dialog
+        PrinterDialog(
+            visible = showPrinterDialog,
+            onDismiss = { showPrinterDialog = false }
+        )
     }
 
     val activity = context as? ComponentActivity

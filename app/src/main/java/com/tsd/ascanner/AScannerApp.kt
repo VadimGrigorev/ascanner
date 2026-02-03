@@ -4,6 +4,7 @@ import android.app.Application
 import com.tsd.ascanner.data.net.ApiClient
 import com.tsd.ascanner.data.auth.AuthService
 import com.tsd.ascanner.data.docs.DocsService
+import com.tsd.ascanner.data.printer.TscPrinterService
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -16,6 +17,8 @@ class AScannerApp : Application() {
     lateinit var authService: AuthService
         private set
     lateinit var docsService: DocsService
+        private set
+    lateinit var printerService: TscPrinterService
         private set
 
 	/**
@@ -45,6 +48,7 @@ class AScannerApp : Application() {
         apiClient = ApiClient()
         authService = AuthService(apiClient)
         docsService = DocsService(apiClient, authService)
+        printerService = TscPrinterService(this)
     }
 }
 
