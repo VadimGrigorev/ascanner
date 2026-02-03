@@ -14,6 +14,18 @@ class DocsService(
     private val apiClient: ApiClient,
     private val authService: AuthService
 ) {
+	private fun isValidHexColor(raw: String?): Boolean {
+		val s = raw?.trim()?.removePrefix("#") ?: return false
+		if (s.isBlank()) return false
+		if (s.length != 6 && s.length != 8) return false
+		return try {
+			android.graphics.Color.parseColor("#$s")
+			true
+		} catch (_: IllegalArgumentException) {
+			false
+		}
+	}
+
 	private val _currentDoc = MutableStateFlow<DocOneResponse?>(null)
 	val currentDocFlow = _currentDoc.asStateFlow()
 
@@ -74,17 +86,37 @@ class DocsService(
 
 		when (respForm.lowercase()) {
 			"doc" -> {
+				val prev = currentDoc
 				val doc = Gson().fromJson(obj, DocOneResponse::class.java)
-				currentDoc = doc
+				val newFormId = doc.formId ?: formId
+				val merged = if (newFormId != null &&
+					prev?.formId == newFormId &&
+					!isValidHexColor(doc.backgroundColor)
+				) {
+					doc.copy(backgroundColor = prev.backgroundColor)
+				} else {
+					doc
+				}
+				currentDoc = merged
 				if (emitNav) {
-					_navEvents.emit(NavTarget(form = "doc", formId = doc.formId ?: formId))
+					_navEvents.emit(NavTarget(form = "doc", formId = merged.formId ?: formId))
 				}
 			}
 			"pos" -> {
+				val prev = currentPos
 				val pos = Gson().fromJson(obj, PosResponse::class.java)
-				currentPos = pos
+				val newFormId = pos.formId ?: formId
+				val merged = if (newFormId != null &&
+					prev?.formId == newFormId &&
+					!isValidHexColor(pos.backgroundColor)
+				) {
+					pos.copy(backgroundColor = prev.backgroundColor)
+				} else {
+					pos
+				}
+				currentPos = merged
 				if (emitNav) {
-					_navEvents.emit(NavTarget(form = "pos", formId = pos.formId ?: formId))
+					_navEvents.emit(NavTarget(form = "pos", formId = merged.formId ?: formId))
 				}
 			}
 		}

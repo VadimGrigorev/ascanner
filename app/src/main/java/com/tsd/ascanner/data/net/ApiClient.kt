@@ -162,6 +162,11 @@ class ApiClient(
 						obj.has("statusColor") -> obj.get("statusColor").asString
 						else -> null
 					}
+					val backgroundColor = when {
+						obj.has("BackgroundColor") -> obj.get("BackgroundColor").asString
+						obj.has("backgroundColor") -> obj.get("backgroundColor").asString
+						else -> null
+					}
 					val buttons = buildList {
 						if (obj.has("Buttons") && obj.get("Buttons").isJsonArray) {
 							for (el in obj.getAsJsonArray("Buttons")) {
@@ -181,6 +186,7 @@ class ApiClient(
 							text = text,
 							status = status,
 							statusColor = statusColor,
+							backgroundColor = backgroundColor,
 							buttons = buttons
 						)
 					)
@@ -226,6 +232,11 @@ class ApiClient(
 					val statusColor = when {
 						obj.has("StatusColor") -> obj.get("StatusColor").asString
 						obj.has("statusColor") -> obj.get("statusColor").asString
+						else -> null
+					}
+					val backgroundColor = when {
+						obj.has("BackgroundColor") -> obj.get("BackgroundColor").asString
+						obj.has("backgroundColor") -> obj.get("backgroundColor").asString
 						else -> null
 					}
 					val selectedId = if (obj.has("SelectedId")) obj.get("SelectedId").asString else null
@@ -281,6 +292,7 @@ class ApiClient(
 							statusText = statusText,
 							status = status,
 							statusColor = statusColor,
+							backgroundColor = backgroundColor,
 							items = items,
 							buttons = buttons
 						)

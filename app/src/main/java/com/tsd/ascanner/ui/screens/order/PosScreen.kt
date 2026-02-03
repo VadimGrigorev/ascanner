@@ -66,6 +66,7 @@ import com.tsd.ascanner.utils.DebugFlags
 import com.tsd.ascanner.utils.DebugSession
 import com.tsd.ascanner.ui.components.ServerActionButtons
 import com.tsd.ascanner.ui.theme.statusCardColor
+import com.tsd.ascanner.ui.theme.parseHexColorOrNull
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
 
@@ -230,7 +231,8 @@ fun PosScreen(
         }
     }
 
-    Box(modifier = Modifier.fillMaxSize().padding(paddingValues)) {
+	val screenBg = parseHexColorOrNull(pos?.backgroundColor) ?: colors.background
+    Box(modifier = Modifier.fillMaxSize().background(screenBg).padding(paddingValues)) {
 		val serverButtons = pos?.buttons.orEmpty()
 		val showCameraFab = DebugFlags.CAMERA_SCAN_ENABLED && DebugSession.debugModeEnabled
 		val hasBottomActions = serverButtons.isNotEmpty() || showCameraFab

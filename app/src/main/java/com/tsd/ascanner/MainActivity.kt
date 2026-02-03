@@ -62,6 +62,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.window.DialogProperties
 import androidx.compose.material3.CircularProgressIndicator
 import com.tsd.ascanner.ui.theme.statusCardColor
+import com.tsd.ascanner.ui.theme.parseHexColorOrNull
 import com.tsd.ascanner.ui.screens.select.SelectScreen
 
 class MainActivity : ComponentActivity() {
@@ -91,7 +92,14 @@ class MainActivity : ComponentActivity() {
                 }
 				LaunchedEffect(Unit) {
 					DialogBus.events.collectLatest { dlg ->
-						globalDialog = dlg
+						val prev = globalDialog
+						globalDialog = if (parseHexColorOrNull(dlg.backgroundColor) != null) {
+							dlg
+						} else if (prev != null && prev.form == dlg.form && prev.formId == dlg.formId) {
+							dlg.copy(backgroundColor = prev.backgroundColor)
+						} else {
+							dlg
+						}
 						dialogSending = false
 					}
 				}
@@ -105,7 +113,14 @@ class MainActivity : ComponentActivity() {
 				}
 				LaunchedEffect(Unit) {
 					SelectBus.events.collectLatest { select ->
-						globalSelect = select
+						val prev = globalSelect
+						globalSelect = if (parseHexColorOrNull(select.backgroundColor) != null) {
+							select
+						} else if (prev != null && prev.form == select.form && prev.formId == select.formId) {
+							select.copy(backgroundColor = prev.backgroundColor)
+						} else {
+							select
+						}
 						val route = navController.currentBackStackEntry?.destination?.route
 						if (route != "select") {
 							navController.navigate("select") {
@@ -246,7 +261,7 @@ class MainActivity : ComponentActivity() {
 						// Global server-driven dialog (MessageType="dialog")
 						val dlg = globalDialog
 						if (dlg != null) {
-							val bg = statusCardColor(
+							val bg = parseHexColorOrNull(dlg.backgroundColor) ?: statusCardColor(
 								colors = appColors,
 								status = dlg.status,
 								statusColor = dlg.statusColor

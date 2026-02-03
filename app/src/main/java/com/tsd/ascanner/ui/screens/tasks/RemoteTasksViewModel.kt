@@ -8,6 +8,7 @@ import androidx.lifecycle.viewModelScope
 import com.tsd.ascanner.data.docs.DocsService
 import com.tsd.ascanner.data.docs.TaskDto
 import com.tsd.ascanner.data.docs.ActionButtonDto
+import com.tsd.ascanner.ui.theme.parseHexColorOrNull
 import com.tsd.ascanner.utils.ServerDialogShownException
 import kotlinx.coroutines.launch
 
@@ -17,6 +18,8 @@ class RemoteTasksViewModel(
     var tasks by mutableStateOf<List<TaskDto>>(emptyList())
         private set
 	var buttons by mutableStateOf<List<ActionButtonDto>>(emptyList())
+		private set
+	var backgroundColorHex by mutableStateOf<String?>(null)
 		private set
     var expandedTaskIds by mutableStateOf<Set<String>>(emptySet())
         private set
@@ -46,6 +49,9 @@ class RemoteTasksViewModel(
 					val resp = docsService.fetchDocs(logRequest = true)
 					tasks = resp.tasks
 					buttons = resp.buttons
+					if (parseHexColorOrNull(resp.backgroundColor) != null) {
+						backgroundColorHex = resp.backgroundColor
+					}
 				} catch (e: Exception) {
 					if (e !is ServerDialogShownException) {
 						errorMessage = e.message ?: "Ошибка загрузки документов"
@@ -65,6 +71,9 @@ class RemoteTasksViewModel(
 					val resp = docsService.fetchDocs(logRequest = false)
 					tasks = resp.tasks
 					buttons = resp.buttons
+					if (parseHexColorOrNull(resp.backgroundColor) != null) {
+						backgroundColorHex = resp.backgroundColor
+					}
 				} catch (e: Exception) {
 					// Можно при желании не трогать errorMessage, чтобы не спамить баннером
 					if (e !is ServerDialogShownException) {

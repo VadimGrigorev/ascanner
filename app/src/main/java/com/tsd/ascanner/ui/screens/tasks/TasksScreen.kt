@@ -70,6 +70,7 @@ import com.tsd.ascanner.utils.DebugFlags
 import com.tsd.ascanner.utils.DebugSession
 import com.tsd.ascanner.ui.components.ServerActionButtons
 import com.tsd.ascanner.ui.theme.statusCardColor
+import com.tsd.ascanner.ui.theme.parseHexColorOrNull
 
 class TasksViewModel(private val service: DocsService) : ViewModel()
 
@@ -211,7 +212,8 @@ fun TasksScreen(
         }
     }
 
-    Box(modifier = Modifier.fillMaxSize().padding(paddingValues)) {
+	val screenBg = parseHexColorOrNull(vm.backgroundColorHex) ?: colors.background
+    Box(modifier = Modifier.fillMaxSize().background(screenBg).padding(paddingValues)) {
 		val serverButtons = vm.buttons
 		val showRefreshFab = DebugFlags.REFRESH_BUTTONS_ENABLED
 		val showCameraFab = DebugFlags.CAMERA_SCAN_ENABLED && DebugSession.debugModeEnabled

@@ -18,7 +18,8 @@ data class DocListRequest(
 
 data class DocListResponse(
     @SerializedName("Tasks") val tasks: List<TaskDto> = emptyList(),
-	@SerializedName("Buttons") val buttons: List<ActionButtonDto> = emptyList()
+	@SerializedName("Buttons") val buttons: List<ActionButtonDto> = emptyList(),
+	@SerializedName(value = "BackgroundColor", alternate = ["backgroundColor"]) val backgroundColor: String? = null
 )
 
 data class TaskDto(
@@ -53,6 +54,7 @@ data class DocOneResponse(
     @SerializedName("StatusText") val statusText: String? = null,
     @SerializedName("Status") val status: String? = null,
 	@SerializedName(value = "StatusColor", alternate = ["statusColor"]) val statusColor: String? = null,
+	@SerializedName(value = "BackgroundColor", alternate = ["backgroundColor"]) val backgroundColor: String? = null,
     @SerializedName("Items") val items: List<DocItemDto> = emptyList(),
 	@SerializedName("Buttons") val buttons: List<ActionButtonDto> = emptyList()
 )
@@ -102,6 +104,7 @@ data class PosResponse(
     @SerializedName("StatusText") val statusText: String? = null,
     @SerializedName("Status") val status: String? = null,
 	@SerializedName(value = "StatusColor", alternate = ["statusColor"]) val statusColor: String? = null,
+	@SerializedName(value = "BackgroundColor", alternate = ["backgroundColor"]) val backgroundColor: String? = null,
     @SerializedName("Items") val items: List<PosItemDto> = emptyList(),
 	@SerializedName("Buttons") val buttons: List<ActionButtonDto> = emptyList()
 )

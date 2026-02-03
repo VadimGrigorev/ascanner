@@ -60,6 +60,7 @@ import com.tsd.ascanner.utils.DebugFlags
 import com.tsd.ascanner.utils.DebugSession
 import com.tsd.ascanner.ui.components.ServerActionButtons
 import com.tsd.ascanner.ui.theme.statusCardColor
+import com.tsd.ascanner.ui.theme.parseHexColorOrNull
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
 
@@ -236,7 +237,8 @@ fun DocScreen(
         }
     }
 
-    Box(modifier = Modifier.fillMaxSize().padding(paddingValues)) {
+	val screenBg = parseHexColorOrNull(doc?.backgroundColor) ?: colors.background
+    Box(modifier = Modifier.fillMaxSize().background(screenBg).padding(paddingValues)) {
 		val serverButtons = doc?.buttons.orEmpty()
 		val showRefreshFab = DebugFlags.REFRESH_BUTTONS_ENABLED
 		val showCameraFab = DebugFlags.CAMERA_SCAN_ENABLED && DebugSession.debugModeEnabled

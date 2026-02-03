@@ -1,6 +1,7 @@
 package com.tsd.ascanner.ui.screens.select
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -34,6 +35,7 @@ import com.tsd.ascanner.ui.components.ServerActionButtons
 import com.tsd.ascanner.ui.components.parseServerIconOrFallback
 import com.tsd.ascanner.ui.theme.AppTheme
 import com.tsd.ascanner.ui.theme.statusCardColor
+import com.tsd.ascanner.ui.theme.parseHexColorOrNull
 import com.tsd.ascanner.utils.ErrorBus
 import com.tsd.ascanner.utils.ServerSelect
 import kotlinx.coroutines.launch
@@ -48,10 +50,11 @@ fun SelectScreen(
 	val app = ctx.applicationContext as AScannerApp
 	val docsService = app.docsService
 	val colors = AppTheme.colors
+	val screenBg = parseHexColorOrNull(select?.backgroundColor) ?: colors.background
 	val scope = rememberCoroutineScope()
 	var sending by remember { mutableStateOf(false) }
 
-	Box(modifier = Modifier.fillMaxSize().padding(paddingValues)) {
+	Box(modifier = Modifier.fillMaxSize().background(screenBg).padding(paddingValues)) {
 		val payload = select
 		if (payload == null) {
 			CircularProgressIndicator(

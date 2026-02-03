@@ -10,6 +10,7 @@ data class ServerSelect(
 	val statusText: String? = null,
 	val status: String? = null,
 	val statusColor: String? = null,
+	val backgroundColor: String? = null,
 	val items: List<ServerSelectItem> = emptyList(),
 	val buttons: List<ActionButtonDto> = emptyList()
 )
