@@ -95,29 +95,8 @@ class MainActivity : ComponentActivity() {
 				LaunchedEffect(Unit) {
 					PrintBus.events.collectLatest { printRequest ->
 						currentPrintRequest = printRequest
-						// Try smart print first
-						scope.launch {
-							when (val result = app.printerService.smartPrintFromBase64(
-								printRequest.pictureBase64,
-								printRequest.paperWidthMm,
-								printRequest.paperHeightMm,
-								printRequest.copies
-							)) {
-								is TscPrinterService.PrintResult.Success -> {
-									// Print successful, clear request
-									currentPrintRequest = null
-								}
-								is TscPrinterService.PrintResult.NeedPrinterSelection -> {
-									// Need to show printer dialog
-									showPrinterDialog = true
-								}
-								is TscPrinterService.PrintResult.Error -> {
-									// Show error, clear request
-									ErrorBus.emit(result.message)
-									currentPrintRequest = null
-								}
-							}
-						}
+						// Always show printer selection dialog. Printing must be user-confirmed.
+						showPrinterDialog = true
 					}
 				}
 				LaunchedEffect(Unit) {

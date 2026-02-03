@@ -64,7 +64,7 @@ import kotlinx.coroutines.launch
  * Dialog for managing TSC RE310 printer connection and printing.
  * 
  * @param visible Whether the dialog is visible
- * @param printRequest Optional print request from server (if provided, will auto-print after connection)
+ * @param printRequest Optional print request from server (if provided, user can print it manually)
  * @param onDismiss Called when dialog is dismissed
  * @param onPrintSuccess Called when print is successful (only when printRequest is provided)
  */
@@ -130,30 +130,12 @@ fun PrinterDialog(
         }
     }
 
-    // Connect to device and optionally auto-print
+    // Connect to device (printing is always manual via button)
     fun connectToDevice(device: BluetoothDevice) {
         scope.launch {
             isLoading = true
             printResult = null
             val connected = printerService.connect(device)
-            
-            // If connected and we have a print request, auto-print
-            if (connected && printRequest != null) {
-                val success = printerService.printFromBase64(
-                    printRequest.pictureBase64,
-                    printRequest.paperWidthMm,
-                    printRequest.paperHeightMm,
-                    printRequest.copies
-                )
-                if (success) {
-                    printResult = "Напечатано"
-                    isLoading = false
-                    onPrintSuccess()
-                    return@launch
-                } else {
-                    printResult = "Ошибка печати"
-                }
-            }
             isLoading = false
         }
     }

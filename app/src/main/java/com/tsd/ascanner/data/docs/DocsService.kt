@@ -48,6 +48,15 @@ class DocsService(
 		fallbackForm: String? = null,
 		emitNav: Boolean = true
 	) {
+		// Server-side print is a side-effect, not a screen/form update.
+		// If we treat it as a normal "doc"/"pos" response, we may overwrite UI state
+		// with an empty model (print payload doesn't contain HeaderText/Items/etc),
+		// which looks like a white/blank screen until the next refresh.
+		val messageType = if (obj.has("MessageType")) obj.get("MessageType").asString else null
+		if (messageType != null && messageType.equals("print", ignoreCase = true)) {
+			return
+		}
+
 		val respForm = when {
 			obj.has("Form") -> obj.get("Form").asString
 			!fallbackForm.isNullOrBlank() -> fallbackForm
@@ -132,6 +141,10 @@ class DocsService(
         val obj = element.asJsonObject
         val messageType = if (obj.has("MessageType")) obj.get("MessageType").asString else null
 		if (messageType != null && messageType.equals("dialog", ignoreCase = true)) {
+			return ScanDocResult.DialogShown
+		}
+		// Print is a side-effect handled globally (PrintBus + PrinterDialog). It is not a document payload.
+		if (messageType != null && messageType.equals("print", ignoreCase = true)) {
 			return ScanDocResult.DialogShown
 		}
         if (messageType != null && messageType.equals("error", ignoreCase = true)) {
