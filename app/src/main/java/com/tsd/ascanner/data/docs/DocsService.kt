@@ -56,6 +56,10 @@ class DocsService(
 		if (messageType != null && messageType.equals("print", ignoreCase = true)) {
 			return
 		}
+		// Select page is a global screen (handled via SelectBus + MainActivity navigation), not a form update.
+		if (messageType != null && messageType.equals("select", ignoreCase = true)) {
+			return
+		}
 
 		val respForm = when {
 			obj.has("Form") -> obj.get("Form").asString
@@ -145,6 +149,10 @@ class DocsService(
 		}
 		// Print is a side-effect handled globally (PrintBus + PrinterDialog). It is not a document payload.
 		if (messageType != null && messageType.equals("print", ignoreCase = true)) {
+			return ScanDocResult.DialogShown
+		}
+		// Select is a global screen handled via SelectBus + MainActivity navigation.
+		if (messageType != null && messageType.equals("select", ignoreCase = true)) {
 			return ScanDocResult.DialogShown
 		}
         if (messageType != null && messageType.equals("error", ignoreCase = true)) {
@@ -284,6 +292,28 @@ class DocsService(
 	suspend fun sendButton(form: String, formId: String, buttonId: String, requestType: String = "dialog"): ButtonResult {
 		val bearer = authService.bearer ?: return ButtonResult.Error("Нет токена авторизации")
 		val req = ButtonRequest(bearer = bearer, form = form, formId = formId, request = requestType, buttonId = buttonId)
+		return try {
+			val element = apiClient.postForJsonElement("/button", req, logRequest = true)
+			if (!element.isJsonObject) return ButtonResult.Success
+			val obj = element.asJsonObject
+			val messageType = if (obj.has("MessageType")) obj.get("MessageType").asString else null
+			if (messageType != null && messageType.equals("dialog", ignoreCase = true)) {
+				return ButtonResult.DialogShown
+			}
+			if (messageType != null && messageType.equals("error", ignoreCase = true)) {
+				val msg = if (obj.has("Message")) obj.get("Message").asString else "Ошибка"
+				return ButtonResult.Error(msg)
+			}
+			routeByForm(obj, fallbackForm = form)
+			ButtonResult.Success
+		} catch (e: Exception) {
+			ButtonResult.Error(e.message ?: "Ошибка запроса")
+		}
+	}
+
+	suspend fun sendSelect(form: String, formId: String, selectedId: String): ButtonResult {
+		val bearer = authService.bearer ?: return ButtonResult.Error("Нет токена авторизации")
+		val req = SelectRequest(bearer = bearer, form = form, formId = formId, request = "select", selectedId = selectedId)
 		return try {
 			val element = apiClient.postForJsonElement("/button", req, logRequest = true)
 			if (!element.isJsonObject) return ButtonResult.Success

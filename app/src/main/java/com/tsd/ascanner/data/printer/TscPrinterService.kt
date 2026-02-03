@@ -23,10 +23,12 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.withContext
+import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
 import java.io.IOException
 import java.io.OutputStream
 import java.util.UUID
+import java.util.zip.GZIPInputStream
 
 /**
  * Service for communicating with TSC RE310 label printer via Bluetooth.
@@ -677,13 +679,57 @@ class TscPrinterService(private val context: Context) {
      */
     private fun decodeBase64ToBitmap(base64: String): Bitmap? {
         return try {
-            val bytes = Base64.decode(base64, Base64.DEFAULT)
+            val decoded = Base64.decode(base64, Base64.DEFAULT)
+            val bytes = maybeGunzip(decoded)
             BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
         } catch (e: Exception) {
             Log.e(TAG, "Failed to decode Base64 image", e)
+            // Keep a more specific error (e.g. gzip unpack failure) if it was already set.
+            if (_lastError.value.isNullOrBlank()) {
+                _lastError.value = "Не удалось декодировать изображение: ${e.message}"
+            }
             null
         }
     }
+
+	/**
+	 * If the given bytes look like gzip (magic 1F 8B), decompress them.
+	 * Otherwise return the original bytes.
+	 *
+	 * Important: server may send Picture as base64(gzip(imageBytes)) to reduce payload size.
+	 */
+	private fun maybeGunzip(bytes: ByteArray): ByteArray {
+		// gzip header: 0x1F 0x8B
+		if (bytes.size < 2) return bytes
+		val b0 = bytes[0].toInt() and 0xFF
+		val b1 = bytes[1].toInt() and 0xFF
+		if (b0 != 0x1F || b1 != 0x8B) return bytes
+
+		// Guard against accidental/hostile huge decompressions.
+		val maxBytes = 20 * 1024 * 1024 // 20 MB
+
+		return try {
+			GZIPInputStream(ByteArrayInputStream(bytes)).use { gis ->
+				val out = ByteArrayOutputStream()
+				val buf = ByteArray(8 * 1024)
+				var total = 0
+				while (true) {
+					val n = gis.read(buf)
+					if (n <= 0) break
+					total += n
+					if (total > maxBytes) {
+						throw IllegalStateException("Распакованное изображение слишком большое (>${maxBytes / (1024 * 1024)} MB)")
+					}
+					out.write(buf, 0, n)
+				}
+				out.toByteArray()
+			}
+		} catch (e: Exception) {
+			Log.e(TAG, "Failed to gunzip Picture payload", e)
+			_lastError.value = "Не удалось распаковать gzip-изображение: ${e.message}"
+			throw e
+		}
+	}
     
     /**
      * Convert a Bitmap to 1-bit monochrome byte array with custom dimensions.
@@ -816,9 +862,13 @@ class TscPrinterService(private val context: Context) {
         heightMm: Float,
         copies: Int = 1
     ): Boolean {
+		_lastError.value = null
         val bitmap = decodeBase64ToBitmap(base64)
         if (bitmap == null) {
-            _lastError.value = "Не удалось декодировать изображение"
+			// Keep the more specific error (e.g. gzip unpack failed) if it was set.
+            if (_lastError.value.isNullOrBlank()) {
+				_lastError.value = "Не удалось декодировать изображение"
+			}
             return false
         }
         

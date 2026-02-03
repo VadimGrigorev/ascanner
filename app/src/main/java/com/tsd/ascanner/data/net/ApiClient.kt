@@ -17,10 +17,14 @@ import com.tsd.ascanner.utils.ErrorBus
 import com.tsd.ascanner.utils.AppEventBus
 import com.tsd.ascanner.utils.DialogBus
 import com.tsd.ascanner.utils.PrintBus
+import com.tsd.ascanner.utils.SelectBus
 import com.tsd.ascanner.utils.ServerDialog
 import com.tsd.ascanner.utils.ServerDialogButton
 import com.tsd.ascanner.utils.ServerDialogShownException
 import com.tsd.ascanner.utils.ServerPrintRequest
+import com.tsd.ascanner.utils.ServerSelect
+import com.tsd.ascanner.utils.ServerSelectItem
+import com.tsd.ascanner.data.docs.ActionButtonDto
 
 class ApiClient(
     private val gson: Gson = Gson()
@@ -211,6 +215,77 @@ class ApiClient(
 							)
 						)
 					}
+					return
+				}
+				// Handle select page from server (MessageType="select")
+				if (mt != null && mt.equals("select", ignoreCase = true)) {
+					val formId = if (obj.has("FormId")) obj.get("FormId").asString else ""
+					val headerText = if (obj.has("HeaderText")) obj.get("HeaderText").asString else ""
+					val statusText = if (obj.has("StatusText")) obj.get("StatusText").asString else ""
+					val status = if (obj.has("Status")) obj.get("Status").asString else ""
+					val statusColor = when {
+						obj.has("StatusColor") -> obj.get("StatusColor").asString
+						obj.has("statusColor") -> obj.get("statusColor").asString
+						else -> null
+					}
+					val selectedId = if (obj.has("SelectedId")) obj.get("SelectedId").asString else null
+					val items = buildList {
+						if (obj.has("Items") && obj.get("Items").isJsonArray) {
+							for (el in obj.getAsJsonArray("Items")) {
+								if (!el.isJsonObject) continue
+								val it = el.asJsonObject
+								val name = if (it.has("Name")) it.get("Name").asString else ""
+								val id = if (it.has("Id")) it.get("Id").asString else ""
+								if (id.isBlank()) continue
+								val comment = if (it.has("Comment")) it.get("Comment").asString else null
+								val itemStatus = if (it.has("Status")) it.get("Status").asString else null
+								val itemStatusColor = when {
+									it.has("StatusColor") -> it.get("StatusColor").asString
+									it.has("statusColor") -> it.get("statusColor").asString
+									else -> null
+								}
+								val icon = if (it.has("Icon")) it.get("Icon").asString else null
+								add(
+									ServerSelectItem(
+										name = name,
+										id = id,
+										comment = comment,
+										status = itemStatus,
+										statusColor = itemStatusColor,
+										icon = icon
+									)
+								)
+							}
+						}
+					}
+					val buttons = buildList {
+						if (obj.has("Buttons") && obj.get("Buttons").isJsonArray) {
+							for (el in obj.getAsJsonArray("Buttons")) {
+								if (!el.isJsonObject) continue
+								val b = el.asJsonObject
+								val id = if (b.has("Id")) b.get("Id").asString else ""
+								if (id.isBlank()) continue
+								val name = if (b.has("Name")) b.get("Name").asString else null
+								val icon = if (b.has("Icon")) b.get("Icon").asString else null
+								val color = if (b.has("Color")) b.get("Color").asString else null
+								add(ActionButtonDto(id = id, name = name, icon = icon, color = color))
+							}
+						}
+					}
+					SelectBus.emit(
+						ServerSelect(
+							form = form ?: "",
+							formId = formId,
+							selectedId = selectedId,
+							headerText = headerText,
+							statusText = statusText,
+							status = status,
+							statusColor = statusColor,
+							items = items,
+							buttons = buttons
+						)
+					)
+					if (throwOnDialog) throw ServerDialogShownException()
 					return
 				}
                 if (mt != null && mt.equals("error", ignoreCase = true)) {

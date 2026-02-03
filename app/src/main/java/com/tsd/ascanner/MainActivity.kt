@@ -30,8 +30,10 @@ import com.tsd.ascanner.utils.ScanTriggerBus
 import com.tsd.ascanner.utils.ErrorBus
 import com.tsd.ascanner.utils.DialogBus
 import com.tsd.ascanner.utils.PrintBus
+import com.tsd.ascanner.utils.SelectBus
 import com.tsd.ascanner.utils.ServerDialog
 import com.tsd.ascanner.utils.ServerPrintRequest
+import com.tsd.ascanner.utils.ServerSelect
 import com.tsd.ascanner.utils.AppEvent
 import com.tsd.ascanner.utils.AppEventBus
 import com.tsd.ascanner.ui.components.PrinterDialog
@@ -60,6 +62,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.window.DialogProperties
 import androidx.compose.material3.CircularProgressIndicator
 import com.tsd.ascanner.ui.theme.statusCardColor
+import com.tsd.ascanner.ui.screens.select.SelectScreen
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -79,6 +82,7 @@ class MainActivity : ComponentActivity() {
 				var dialogSending by remember { mutableStateOf(false) }
 				var currentPrintRequest by remember { mutableStateOf<ServerPrintRequest?>(null) }
 				var showPrinterDialog by remember { mutableStateOf(false) }
+				var globalSelect by remember { mutableStateOf<ServerSelect?>(null) }
 				val scope = rememberCoroutineScope()
                 LaunchedEffect(Unit) {
                     ErrorBus.events.collectLatest { msg ->
@@ -97,6 +101,17 @@ class MainActivity : ComponentActivity() {
 						currentPrintRequest = printRequest
 						// Always show printer selection dialog. Printing must be user-confirmed.
 						showPrinterDialog = true
+					}
+				}
+				LaunchedEffect(Unit) {
+					SelectBus.events.collectLatest { select ->
+						globalSelect = select
+						val route = navController.currentBackStackEntry?.destination?.route
+						if (route != "select") {
+							navController.navigate("select") {
+								launchSingleTop = true
+							}
+						}
 					}
 				}
 				LaunchedEffect(Unit) {
@@ -123,6 +138,7 @@ class MainActivity : ComponentActivity() {
 						val entry = navController.currentBackStackEntry
 						val route = entry?.destination?.route
 						val currentDocId = entry?.arguments?.getString("formId")?.let { Uri.decode(it) }
+						val fromSelect = route == "select"
 						when (target.form.lowercase()) {
 							"doc" -> {
 								val fid = target.formId
@@ -130,6 +146,9 @@ class MainActivity : ComponentActivity() {
 									val alreadyOnSameDoc = route == "doc/{formId}" && currentDocId == fid
 									if (!alreadyOnSameDoc) {
 										navController.navigate("doc/${Uri.encode(fid)}") {
+											if (fromSelect) {
+												popUpTo("select") { inclusive = true }
+											}
 											launchSingleTop = true
 										}
 									}
@@ -138,6 +157,9 @@ class MainActivity : ComponentActivity() {
 							"pos" -> {
 								if (route != "pos") {
 									navController.navigate("pos") {
+										if (fromSelect) {
+											popUpTo("select") { inclusive = true }
+										}
 										launchSingleTop = true
 									}
 								}
@@ -190,6 +212,13 @@ class MainActivity : ComponentActivity() {
                                     }
                                 )
                             }
+							composable("select") {
+								SelectScreen(
+									paddingValues = padding,
+									select = globalSelect,
+									onClose = { navController.popBackStack() }
+								)
+							}
                         }
                         val err = globalError
                         LaunchedEffect(err) {

@@ -133,4 +133,13 @@ data class ButtonRequest(
 	@SerializedName("ButtonId") val buttonId: String
 )
 
+// Request triggered by select page option click (MessageType="select")
+data class SelectRequest(
+	@SerializedName("Bearer") val bearer: String,
+	@SerializedName("Form") val form: String,
+	@SerializedName("FormId") val formId: String,
+	@SerializedName("Request") val request: String = "select",
+	@SerializedName("SelectedId") val selectedId: String
+)
+
 
