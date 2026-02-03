@@ -16,9 +16,11 @@ import javax.net.ssl.HttpsURLConnection
 import com.tsd.ascanner.utils.ErrorBus
 import com.tsd.ascanner.utils.AppEventBus
 import com.tsd.ascanner.utils.DialogBus
+import com.tsd.ascanner.utils.PrintBus
 import com.tsd.ascanner.utils.ServerDialog
 import com.tsd.ascanner.utils.ServerDialogButton
 import com.tsd.ascanner.utils.ServerDialogShownException
+import com.tsd.ascanner.utils.ServerPrintRequest
 
 class ApiClient(
     private val gson: Gson = Gson()
@@ -179,6 +181,36 @@ class ApiClient(
 						)
 					)
 					if (throwOnDialog) throw ServerDialogShownException()
+					return
+				}
+				// Handle print command from server
+				if (mt != null && mt.equals("print", ignoreCase = true)) {
+					val formId = if (obj.has("FormId")) obj.get("FormId").asString else ""
+					val picture = if (obj.has("Picture")) obj.get("Picture").asString else ""
+					val pictureType = if (obj.has("PictureType")) obj.get("PictureType").asString else "bmp"
+					val paperWidth = if (obj.has("PaperWidth")) {
+						obj.get("PaperWidth").asString.toFloatOrNull() ?: 50f
+					} else 50f
+					val paperHeight = if (obj.has("PaperHeight")) {
+						obj.get("PaperHeight").asString.toFloatOrNull() ?: 30f
+					} else 30f
+					val copies = if (obj.has("PrintCopies")) {
+						obj.get("PrintCopies").asString.toIntOrNull() ?: 1
+					} else 1
+					
+					if (picture.isNotBlank()) {
+						PrintBus.emit(
+							ServerPrintRequest(
+								form = form ?: "",
+								formId = formId,
+								pictureBase64 = picture,
+								pictureType = pictureType,
+								paperWidthMm = paperWidth,
+								paperHeightMm = paperHeight,
+								copies = copies
+							)
+						)
+					}
 					return
 				}
                 if (mt != null && mt.equals("error", ignoreCase = true)) {

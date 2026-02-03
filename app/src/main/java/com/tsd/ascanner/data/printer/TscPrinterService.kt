@@ -9,10 +9,12 @@ import android.bluetooth.BluetoothSocket
 import android.content.Context
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.Typeface
+import android.util.Base64
 import android.os.Build
 import android.util.Log
 import androidx.core.content.ContextCompat
@@ -662,6 +664,196 @@ class TscPrinterService(private val context: Context) {
         } else {
             val error = lastError.value ?: "Ошибка печати"
             Log.e(TAG, "smartPrintTestBitmap: print failed - $error")
+            PrintResult.Error(error)
+        }
+    }
+    
+    /**
+     * Decode a Base64-encoded image string to a Bitmap.
+     * 
+     * @param base64 The Base64-encoded image data
+     * @return Bitmap or null if decoding fails
+     */
+    private fun decodeBase64ToBitmap(base64: String): Bitmap? {
+        return try {
+            val bytes = Base64.decode(base64, Base64.DEFAULT)
+            BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to decode Base64 image", e)
+            null
+        }
+    }
+    
+    /**
+     * Convert a Bitmap to 1-bit monochrome byte array with custom dimensions.
+     * 
+     * @param bitmap Source bitmap
+     * @param targetWidthDots Target width in dots
+     * @param targetHeightDots Target height in dots
+     * @return ByteArray in 1-bit monochrome format
+     */
+    private fun bitmapToMonochromeWithSize(bitmap: Bitmap, targetWidthDots: Int, targetHeightDots: Int): ByteArray {
+        // Scale bitmap to target size
+        val scaledBitmap = Bitmap.createScaledBitmap(bitmap, targetWidthDots, targetHeightDots, true)
+        
+        val width = scaledBitmap.width
+        val height = scaledBitmap.height
+        val widthBytes = (width + 7) / 8  // Round up to nearest byte
+        
+        val result = ByteArray(widthBytes * height)
+        
+        for (y in 0 until height) {
+            for (x in 0 until width) {
+                val pixel = scaledBitmap.getPixel(x, y)
+                
+                // Calculate luminance (grayscale value)
+                val r = Color.red(pixel)
+                val g = Color.green(pixel)
+                val b = Color.blue(pixel)
+                val luminance = (0.299 * r + 0.587 * g + 0.114 * b).toInt()
+                
+                // If dark pixel (luminance < 128), set bit to 1 (black/print)
+                if (luminance < 128) {
+                    val byteIndex = y * widthBytes + (x / 8)
+                    val bitIndex = 7 - (x % 8)  // MSB first
+                    result[byteIndex] = (result[byteIndex].toInt() or (1 shl bitIndex)).toByte()
+                }
+            }
+        }
+        
+        // Recycle scaled bitmap if it's different from original
+        if (scaledBitmap != bitmap) {
+            scaledBitmap.recycle()
+        }
+        
+        return result
+    }
+    
+    /**
+     * Print a bitmap with custom paper dimensions.
+     * 
+     * @param bitmap The bitmap to print
+     * @param widthMm Paper width in millimeters
+     * @param heightMm Paper height in millimeters
+     * @param copies Number of copies to print
+     * @return true if sent successfully
+     */
+    suspend fun printBitmapWithSize(
+        bitmap: Bitmap,
+        widthMm: Float,
+        heightMm: Float,
+        copies: Int = 1
+    ): Boolean = withContext(Dispatchers.IO) {
+        if (!isConnected()) {
+            _lastError.value = "Принтер не подключен"
+            return@withContext false
+        }
+        
+        try {
+            // Calculate dimensions in dots
+            val widthDots = (widthMm * DOTS_PER_MM).toInt()
+            val heightDots = (heightMm * DOTS_PER_MM).toInt()
+            val widthBytes = widthDots / 8
+            
+            // Convert bitmap to monochrome bytes with custom size
+            val bitmapData = bitmapToMonochromeWithSize(bitmap, widthDots, heightDots)
+            
+            Log.d(TAG, "Printing bitmap: ${widthDots}x${heightDots} dots (${widthMm}x${heightMm} mm), ${bitmapData.size} bytes, $copies copies")
+            
+            // Build TSPL command sequence
+            val output = ByteArrayOutputStream()
+            
+            // Set label size
+            output.write("SIZE ${widthMm.toInt()} mm, ${heightMm.toInt()} mm\r\n".toByteArray(Charsets.US_ASCII))
+            
+            // Set gap between labels
+            output.write("GAP 2 mm, 0 mm\r\n".toByteArray(Charsets.US_ASCII))
+            
+            // Set print direction
+            output.write("DIRECTION 1\r\n".toByteArray(Charsets.US_ASCII))
+            
+            // Clear buffer
+            output.write("CLS\r\n".toByteArray(Charsets.US_ASCII))
+            
+            // BITMAP command: BITMAP x, y, width_bytes, height, mode, data
+            val bitmapCmd = "BITMAP 0,0,$widthBytes,$heightDots,0,"
+            output.write(bitmapCmd.toByteArray(Charsets.US_ASCII))
+            
+            // Write raw bitmap data
+            output.write(bitmapData)
+            
+            // End of bitmap data and print command with copies
+            output.write("\r\nPRINT $copies\r\n".toByteArray(Charsets.US_ASCII))
+            
+            // Send all data
+            val success = sendRawData(output.toByteArray())
+            
+            if (success) {
+                Log.d(TAG, "Bitmap sent successfully")
+            }
+            
+            success
+        } catch (e: Exception) {
+            Log.e(TAG, "Error printing bitmap", e)
+            _lastError.value = "Ошибка печати: ${e.message}"
+            false
+        }
+    }
+    
+    /**
+     * Print a Base64-encoded image with custom paper dimensions.
+     * 
+     * @param base64 The Base64-encoded image data
+     * @param widthMm Paper width in millimeters
+     * @param heightMm Paper height in millimeters
+     * @param copies Number of copies to print
+     * @return true if sent successfully
+     */
+    suspend fun printFromBase64(
+        base64: String,
+        widthMm: Float,
+        heightMm: Float,
+        copies: Int = 1
+    ): Boolean {
+        val bitmap = decodeBase64ToBitmap(base64)
+        if (bitmap == null) {
+            _lastError.value = "Не удалось декодировать изображение"
+            return false
+        }
+        
+        val result = printBitmapWithSize(bitmap, widthMm, heightMm, copies)
+        bitmap.recycle()
+        return result
+    }
+    
+    /**
+     * Smart print from Base64 - automatically connects to last printer if needed.
+     * 
+     * @param base64 The Base64-encoded image data
+     * @param widthMm Paper width in millimeters
+     * @param heightMm Paper height in millimeters
+     * @param copies Number of copies to print
+     * @return PrintResult indicating success, need for printer selection, or error
+     */
+    suspend fun smartPrintFromBase64(
+        base64: String,
+        widthMm: Float,
+        heightMm: Float,
+        copies: Int = 1
+    ): PrintResult {
+        // Try to auto-connect if not connected
+        if (!tryAutoConnect()) {
+            Log.d(TAG, "smartPrintFromBase64: auto-connect failed, need printer selection")
+            return PrintResult.NeedPrinterSelection
+        }
+        
+        // Now we're connected - try to print
+        return if (printFromBase64(base64, widthMm, heightMm, copies)) {
+            Log.d(TAG, "smartPrintFromBase64: print successful")
+            PrintResult.Success
+        } else {
+            val error = lastError.value ?: "Ошибка печати"
+            Log.e(TAG, "smartPrintFromBase64: print failed - $error")
             PrintResult.Error(error)
         }
     }

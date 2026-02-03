@@ -29,9 +29,13 @@ import android.view.KeyEvent
 import com.tsd.ascanner.utils.ScanTriggerBus
 import com.tsd.ascanner.utils.ErrorBus
 import com.tsd.ascanner.utils.DialogBus
+import com.tsd.ascanner.utils.PrintBus
 import com.tsd.ascanner.utils.ServerDialog
+import com.tsd.ascanner.utils.ServerPrintRequest
 import com.tsd.ascanner.utils.AppEvent
 import com.tsd.ascanner.utils.AppEventBus
+import com.tsd.ascanner.ui.components.PrinterDialog
+import com.tsd.ascanner.data.printer.TscPrinterService
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -73,6 +77,8 @@ class MainActivity : ComponentActivity() {
                 var globalError by remember { mutableStateOf<String?>(null) }
 				var globalDialog by remember { mutableStateOf<ServerDialog?>(null) }
 				var dialogSending by remember { mutableStateOf(false) }
+				var currentPrintRequest by remember { mutableStateOf<ServerPrintRequest?>(null) }
+				var showPrinterDialog by remember { mutableStateOf(false) }
 				val scope = rememberCoroutineScope()
                 LaunchedEffect(Unit) {
                     ErrorBus.events.collectLatest { msg ->
@@ -83,6 +89,35 @@ class MainActivity : ComponentActivity() {
 					DialogBus.events.collectLatest { dlg ->
 						globalDialog = dlg
 						dialogSending = false
+					}
+				}
+				// Handle print requests from server (MessageType="print")
+				LaunchedEffect(Unit) {
+					PrintBus.events.collectLatest { printRequest ->
+						currentPrintRequest = printRequest
+						// Try smart print first
+						scope.launch {
+							when (val result = app.printerService.smartPrintFromBase64(
+								printRequest.pictureBase64,
+								printRequest.paperWidthMm,
+								printRequest.paperHeightMm,
+								printRequest.copies
+							)) {
+								is TscPrinterService.PrintResult.Success -> {
+									// Print successful, clear request
+									currentPrintRequest = null
+								}
+								is TscPrinterService.PrintResult.NeedPrinterSelection -> {
+									// Need to show printer dialog
+									showPrinterDialog = true
+								}
+								is TscPrinterService.PrintResult.Error -> {
+									// Show error, clear request
+									ErrorBus.emit(result.message)
+									currentPrintRequest = null
+								}
+							}
+						}
 					}
 				}
 				LaunchedEffect(Unit) {
@@ -288,6 +323,20 @@ class MainActivity : ComponentActivity() {
 								}
 							}
 						}
+
+						// Global printer dialog (for MessageType="print")
+						PrinterDialog(
+							visible = showPrinterDialog,
+							printRequest = currentPrintRequest,
+							onDismiss = {
+								showPrinterDialog = false
+								currentPrintRequest = null
+							},
+							onPrintSuccess = {
+								showPrinterDialog = false
+								currentPrintRequest = null
+							}
+						)
                     }
                 }
             }

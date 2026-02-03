@@ -57,16 +57,24 @@ import androidx.compose.ui.window.DialogProperties
 import com.tsd.ascanner.AScannerApp
 import com.tsd.ascanner.data.printer.TscPrinterService
 import com.tsd.ascanner.ui.theme.AppTheme
+import com.tsd.ascanner.utils.ServerPrintRequest
 import kotlinx.coroutines.launch
 
 /**
- * Dialog for managing TSC RE310 printer connection and test printing
+ * Dialog for managing TSC RE310 printer connection and printing.
+ * 
+ * @param visible Whether the dialog is visible
+ * @param printRequest Optional print request from server (if provided, will auto-print after connection)
+ * @param onDismiss Called when dialog is dismissed
+ * @param onPrintSuccess Called when print is successful (only when printRequest is provided)
  */
 @SuppressLint("MissingPermission")
 @Composable
 fun PrinterDialog(
     visible: Boolean,
-    onDismiss: () -> Unit
+    printRequest: ServerPrintRequest? = null,
+    onDismiss: () -> Unit,
+    onPrintSuccess: () -> Unit = {}
 ) {
     if (!visible) return
 
@@ -122,12 +130,30 @@ fun PrinterDialog(
         }
     }
 
-    // Connect to device
+    // Connect to device and optionally auto-print
     fun connectToDevice(device: BluetoothDevice) {
         scope.launch {
             isLoading = true
             printResult = null
-            printerService.connect(device)
+            val connected = printerService.connect(device)
+            
+            // If connected and we have a print request, auto-print
+            if (connected && printRequest != null) {
+                val success = printerService.printFromBase64(
+                    printRequest.pictureBase64,
+                    printRequest.paperWidthMm,
+                    printRequest.paperHeightMm,
+                    printRequest.copies
+                )
+                if (success) {
+                    printResult = "Напечатано"
+                    isLoading = false
+                    onPrintSuccess()
+                    return@launch
+                } else {
+                    printResult = "Ошибка печати"
+                }
+            }
             isLoading = false
         }
     }
@@ -138,7 +164,30 @@ fun PrinterDialog(
         printResult = null
     }
 
-    // Print test label (bitmap)
+    // Print from server request
+    fun printFromRequest() {
+        if (printRequest == null) return
+        scope.launch {
+            isLoading = true
+            printResult = null
+            val success = printerService.printFromBase64(
+                printRequest.pictureBase64,
+                printRequest.paperWidthMm,
+                printRequest.paperHeightMm,
+                printRequest.copies
+            )
+            if (success) {
+                printResult = "Напечатано"
+                isLoading = false
+                onPrintSuccess()
+            } else {
+                printResult = "Ошибка печати"
+                isLoading = false
+            }
+        }
+    }
+
+    // Print test label (bitmap) - only when no server request
     fun printTestLabel() {
         scope.launch {
             isLoading = true
@@ -176,7 +225,7 @@ fun PrinterDialog(
                     )
                     Spacer(Modifier.width(8.dp))
                     Text(
-                        text = "Принтер TSC RE310",
+                        text = if (printRequest != null) "Печать этикетки" else "Принтер TSC RE310",
                         style = MaterialTheme.typography.titleLarge,
                         color = colors.textPrimary
                     )
@@ -219,26 +268,51 @@ fun PrinterDialog(
                         
                         Spacer(Modifier.height(16.dp))
                         
-                        // Print test button
-                        Button(
-                            onClick = { printTestLabel() },
-                            modifier = Modifier.fillMaxWidth(),
-                            enabled = !isLoading,
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = colors.primary
-                            )
-                        ) {
-                            if (isLoading) {
-                                CircularProgressIndicator(
-                                    modifier = Modifier.size(20.dp),
-                                    color = Color.White,
-                                    strokeWidth = 2.dp
+                        // Print button - different behavior based on whether we have a server request
+                        if (printRequest != null) {
+                            // Print from server request
+                            Button(
+                                onClick = { printFromRequest() },
+                                modifier = Modifier.fillMaxWidth(),
+                                enabled = !isLoading,
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = colors.primary
                                 )
-                            } else {
-                                Icon(Icons.Default.Print, contentDescription = null)
+                            ) {
+                                if (isLoading) {
+                                    CircularProgressIndicator(
+                                        modifier = Modifier.size(20.dp),
+                                        color = Color.White,
+                                        strokeWidth = 2.dp
+                                    )
+                                } else {
+                                    Icon(Icons.Default.Print, contentDescription = null)
+                                }
+                                Spacer(Modifier.width(8.dp))
+                                Text("Печать (${printRequest.copies} шт.)")
                             }
-                            Spacer(Modifier.width(8.dp))
-                            Text("Тестовая печать")
+                        } else {
+                            // Test print button (no server request)
+                            Button(
+                                onClick = { printTestLabel() },
+                                modifier = Modifier.fillMaxWidth(),
+                                enabled = !isLoading,
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = colors.primary
+                                )
+                            ) {
+                                if (isLoading) {
+                                    CircularProgressIndicator(
+                                        modifier = Modifier.size(20.dp),
+                                        color = Color.White,
+                                        strokeWidth = 2.dp
+                                    )
+                                } else {
+                                    Icon(Icons.Default.Print, contentDescription = null)
+                                }
+                                Spacer(Modifier.width(8.dp))
+                                Text("Тестовая печать")
+                            }
                         }
                         
                         Spacer(Modifier.height(8.dp))
