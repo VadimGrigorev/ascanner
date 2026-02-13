@@ -8,10 +8,14 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.yield
 
 sealed interface SearchScanMode {
 	data class Marker(val marker: String) : SearchScanMode
@@ -32,6 +36,7 @@ fun ServerSearchField(
 	if (!visible) return
 
 	val focusRequester = remember { FocusRequester() }
+	val scope = rememberCoroutineScope()
 
 	fun commitScan(code: String) {
 		val trimmed = code.trim()
@@ -73,10 +78,16 @@ fun ServerSearchField(
 		trailingIcon = {
 			if (value.isNotBlank()) {
 				IconButton(
+					modifier = Modifier.focusProperties { canFocus = false },
 					onClick = {
 						onValueChange("")
 						// Очистка без blur: возвращаем фокус в поле.
-						focusRequester.requestFocus()
+						scope.launch {
+							// Даем системе обработать возможную смену фокуса на trailing icon,
+							// затем возвращаем фокус обратно в TextField.
+							yield()
+							focusRequester.requestFocus()
+						}
 					}
 				) {
 					Icon(
