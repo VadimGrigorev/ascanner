@@ -21,7 +21,6 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.CircularProgressIndicator
@@ -50,7 +49,6 @@ import androidx.compose.foundation.background
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.draw.alpha
-import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
 import kotlinx.coroutines.launch
@@ -70,6 +68,8 @@ import androidx.lifecycle.LifecycleEventObserver
 import com.tsd.ascanner.utils.DebugFlags
 import com.tsd.ascanner.utils.DebugSession
 import com.tsd.ascanner.ui.components.ServerActionButtons
+import com.tsd.ascanner.ui.components.SearchScanMode
+import com.tsd.ascanner.ui.components.ServerSearchField
 import com.tsd.ascanner.ui.theme.statusCardColor
 import com.tsd.ascanner.ui.theme.parseHexColorOrNull
 
@@ -301,57 +301,48 @@ fun TasksScreen(
                         Text(text = "скрыть завершенные", color = colors.textSecondary)
                     }
 					Spacer(Modifier.height(8.dp))
-					OutlinedTextField(
+					ServerSearchField(
+						visible = vm.isSearchAvailable,
 						value = vm.searchQuery,
-						onValueChange = { value ->
-							vm.updateSearchQuery(value)
-							if (searchFocused) {
-								val marker = "@!@!@NEWDOCUMENT!@!@!"
-								val idx = value.indexOf(marker)
-								if (idx >= 0) {
-									val code = value.substring(idx).trim()
-									// Очистим поиск, чтобы не триггерить повторно
-									vm.updateSearchQuery("")
-									lastScan = code
-									scanError = null
-									scope.launch {
-										try {
-											isRequesting = true
-											when (val res = app.docsService.scanDocList(code)) {
-												is com.tsd.ascanner.data.docs.ScanDocResult.Success -> {
-													isScanning = false
-													val id = res.doc.formId ?: app.docsService.currentDoc?.formId ?: code
-													onOpenDoc(id)
-												}
-												is com.tsd.ascanner.data.docs.ScanDocResult.Error -> {
-													scanError = res.message
-													isScanning = true
-												}
-												is com.tsd.ascanner.data.docs.ScanDocResult.DialogShown -> {
-													isScanning = false
-												}
-											}
-										} catch (e: Exception) {
-											scanError = e.message ?: "Ошибка запроса"
+						onValueChange = { vm.updateSearchQuery(it) },
+						label = "Поиск",
+						scanMode = SearchScanMode.Marker("@!@!@NEWDOCUMENT!@!@!"),
+						onScan = { code ->
+							lastScan = code
+							scanError = null
+							scope.launch {
+								try {
+									isRequesting = true
+									when (val res = app.docsService.scanDocList(code)) {
+										is com.tsd.ascanner.data.docs.ScanDocResult.Success -> {
+											isScanning = false
+											val id = res.doc.formId ?: app.docsService.currentDoc?.formId ?: code
+											onOpenDoc(id)
+										}
+										is com.tsd.ascanner.data.docs.ScanDocResult.Error -> {
+											scanError = res.message
 											isScanning = true
-										} finally {
-											isRequesting = false
+										}
+										is com.tsd.ascanner.data.docs.ScanDocResult.DialogShown -> {
+											isScanning = false
 										}
 									}
+								} catch (e: Exception) {
+									scanError = e.message ?: "Ошибка запроса"
+									isScanning = true
+								} finally {
+									isRequesting = false
 								}
 							}
 						},
-						modifier = Modifier
-							.fillMaxWidth()
-							.onFocusChanged { searchFocused = it.isFocused },
-						label = { Text(text = "Поиск") },
-						singleLine = true
+						modifier = Modifier.fillMaxWidth(),
+						onFocusChanged = { focused -> searchFocused = focused }
 					)
                 }
             }
 
 			// Filter tasks/orders by open/closed and search query
-			val q = vm.searchQuery.trim().lowercase()
+			val q = if (vm.isSearchAvailable) vm.searchQuery.trim().lowercase() else ""
 			val filteredTasks = vm.tasks.mapNotNull { t ->
 				val baseOrders = if (!vm.showOnlyOpen) t.orders else t.orders.filter { (it.status ?: "").lowercase() != "closed" }
 				if (q.isEmpty()) {

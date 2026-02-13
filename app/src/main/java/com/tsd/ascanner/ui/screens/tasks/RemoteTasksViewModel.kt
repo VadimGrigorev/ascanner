@@ -23,6 +23,8 @@ class RemoteTasksViewModel(
 		private set
 	var backgroundColorHex by mutableStateOf<String?>(null)
 		private set
+	var isSearchAvailable by mutableStateOf(false)
+		private set
     var expandedTaskIds by mutableStateOf<Set<String>>(emptySet())
         private set
     var showOnlyOpen by mutableStateOf(false)
@@ -46,6 +48,11 @@ class RemoteTasksViewModel(
 					.collectLatest { resp ->
 						tasks = resp.tasks
 						buttons = resp.buttons
+						val available = resp.searchAvailable?.equals("true", ignoreCase = true) == true
+						isSearchAvailable = available
+						if (!available && searchQuery.isNotBlank()) {
+							searchQuery = ""
+						}
 						if (parseHexColorOrNull(resp.backgroundColor) != null) {
 							backgroundColorHex = resp.backgroundColor
 						}
@@ -65,6 +72,11 @@ class RemoteTasksViewModel(
 					val resp = docsService.fetchDocs(logRequest = true)
 					tasks = resp.tasks
 					buttons = resp.buttons
+					val available = resp.searchAvailable?.equals("true", ignoreCase = true) == true
+					isSearchAvailable = available
+					if (!available && searchQuery.isNotBlank()) {
+						searchQuery = ""
+					}
 					if (parseHexColorOrNull(resp.backgroundColor) != null) {
 						backgroundColorHex = resp.backgroundColor
 					}
@@ -87,6 +99,11 @@ class RemoteTasksViewModel(
 					val resp = docsService.fetchDocs(logRequest = false)
 					tasks = resp.tasks
 					buttons = resp.buttons
+					val available = resp.searchAvailable?.equals("true", ignoreCase = true) == true
+					isSearchAvailable = available
+					if (!available && searchQuery.isNotBlank()) {
+						searchQuery = ""
+					}
 					if (parseHexColorOrNull(resp.backgroundColor) != null) {
 						backgroundColorHex = resp.backgroundColor
 					}

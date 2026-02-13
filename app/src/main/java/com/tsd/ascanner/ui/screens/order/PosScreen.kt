@@ -65,6 +65,8 @@ import androidx.lifecycle.LifecycleEventObserver
 import com.tsd.ascanner.utils.DebugFlags
 import com.tsd.ascanner.utils.DebugSession
 import com.tsd.ascanner.ui.components.ServerActionButtons
+import com.tsd.ascanner.ui.components.SearchScanMode
+import com.tsd.ascanner.ui.components.ServerSearchField
 import com.tsd.ascanner.ui.theme.statusCardColor
 import com.tsd.ascanner.ui.theme.parseHexColorOrNull
 import androidx.compose.ui.layout.onGloballyPositioned
@@ -92,6 +94,8 @@ fun PosScreen(
     val listState = rememberLazyListState()
 	var bottomActionsHeightPx by remember { mutableStateOf(0) }
 	val density = LocalDensity.current
+	var searchQuery by remember { mutableStateOf("") }
+	var searchFocused by remember { mutableStateOf(false) }
     LaunchedEffect(lastScan.value) {
         val hasText = !lastScan.value.isNullOrBlank()
         if (hasText) {
@@ -166,6 +170,13 @@ fun PosScreen(
     LaunchedEffect(scanError.value) {
         scanError.value?.let { ErrorBus.emit(it) }
     }
+
+	val isSearchAvailable = pos?.searchAvailable?.equals("true", ignoreCase = true) == true
+	LaunchedEffect(isSearchAvailable) {
+		if (!isSearchAvailable && searchQuery.isNotBlank()) {
+			searchQuery = ""
+		}
+	}
 
 	// Auto-refresh every 5 seconds while on this screen (без логов)
 	LaunchedEffect(Unit) {
@@ -254,6 +265,20 @@ fun PosScreen(
                     if (statusText.isNotBlank()) {
                         Text(text = statusText, color = colors.textSecondary, modifier = Modifier.padding(top = 4.dp))
                     }
+					if (isSearchAvailable) {
+						ServerSearchField(
+							visible = true,
+							value = searchQuery,
+							onValueChange = { searchQuery = it },
+							label = "Поиск",
+							scanMode = SearchScanMode.ControlChars,
+							onScan = { code -> handleScan(code) },
+							modifier = Modifier
+								.fillMaxWidth()
+								.padding(top = 8.dp),
+							onFocusChanged = { focused -> searchFocused = focused }
+						)
+					}
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -309,10 +334,22 @@ fun PosScreen(
             }
 
 			val itemsList = pos?.items.orEmpty()
+			val q = if (isSearchAvailable) searchQuery.trim() else ""
+			val filteredItems = if (q.isBlank()) {
+				itemsList
+			} else {
+				itemsList.filter { it2 ->
+					it2.name.contains(q, ignoreCase = true) ||
+						it2.id.contains(q, ignoreCase = true) ||
+						(it2.text?.contains(q, ignoreCase = true) == true) ||
+						(it2.statusText?.contains(q, ignoreCase = true) == true) ||
+						((it2.status ?: "").contains(q, ignoreCase = true))
+				}
+			}
             val textColor = colors.textPrimary
             val subColor = colors.textSecondary
 
-            items(itemsList) { it ->
+            items(filteredItems) { it ->
 				val itemBg = statusCardColor(
 					colors = colors,
 					status = it.status,
@@ -435,7 +472,7 @@ fun PosScreen(
                     .alpha(0f)
                     .fillMaxWidth()
                     .height(1.dp),
-                update = { v -> v.post { v.requestFocus() } }
+                update = { v -> v.post { if (!searchFocused) v.requestFocus() } }
             )
         }
 		// (floating actions removed; actions are under heading now)

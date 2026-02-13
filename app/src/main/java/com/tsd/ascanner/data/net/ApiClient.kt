@@ -239,6 +239,7 @@ class ApiClient(
 						obj.has("backgroundColor") -> obj.get("backgroundColor").asString
 						else -> null
 					}
+					val searchAvailable = if (obj.has("SearchAvailable")) obj.get("SearchAvailable").asString else null
 					val selectedId = if (obj.has("SelectedId")) obj.get("SelectedId").asString else null
 					val items = buildList {
 						if (obj.has("Items") && obj.get("Items").isJsonArray) {
@@ -293,6 +294,7 @@ class ApiClient(
 							status = status,
 							statusColor = statusColor,
 							backgroundColor = backgroundColor,
+							searchAvailable = searchAvailable,
 							items = items,
 							buttons = buttons
 						)

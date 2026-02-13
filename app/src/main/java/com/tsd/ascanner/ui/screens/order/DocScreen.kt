@@ -59,6 +59,8 @@ import androidx.lifecycle.LifecycleEventObserver
 import com.tsd.ascanner.utils.DebugFlags
 import com.tsd.ascanner.utils.DebugSession
 import com.tsd.ascanner.ui.components.ServerActionButtons
+import com.tsd.ascanner.ui.components.SearchScanMode
+import com.tsd.ascanner.ui.components.ServerSearchField
 import com.tsd.ascanner.ui.theme.statusCardColor
 import com.tsd.ascanner.ui.theme.parseHexColorOrNull
 import androidx.compose.ui.layout.onGloballyPositioned
@@ -87,6 +89,8 @@ fun DocScreen(
     val listState = rememberLazyListState()
 	var bottomActionsHeightPx by remember { mutableStateOf(0) }
 	val density = LocalDensity.current
+	var searchQuery by remember { mutableStateOf("") }
+	var searchFocused by remember { mutableStateOf(false) }
 
     fun handleScan(code: String) {
         val currentFormId = doc?.formId ?: docsService.currentDoc?.formId
@@ -134,6 +138,13 @@ fun DocScreen(
     LaunchedEffect(scanError.value) {
         scanError.value?.let { ErrorBus.emit(it) }
     }
+
+	val isSearchAvailable = doc?.searchAvailable?.equals("true", ignoreCase = true) == true
+	LaunchedEffect(isSearchAvailable) {
+		if (!isSearchAvailable && searchQuery.isNotBlank()) {
+			searchQuery = ""
+		}
+	}
 
     // Initial load: fetch doc for provided formId (логируем как ручной запрос)
     androidx.compose.runtime.LaunchedEffect(formId) {
@@ -261,6 +272,20 @@ fun DocScreen(
                     if (statusText.isNotBlank()) {
                         Text(text = statusText, color = colors.textSecondary, modifier = Modifier.padding(top = 4.dp))
                     }
+					if (isSearchAvailable) {
+						ServerSearchField(
+							visible = true,
+							value = searchQuery,
+							onValueChange = { searchQuery = it },
+							label = "Поиск",
+							scanMode = SearchScanMode.ControlChars,
+							onScan = { code -> handleScan(code) },
+							modifier = Modifier
+								.fillMaxWidth()
+								.padding(top = 8.dp),
+							onFocusChanged = { focused -> searchFocused = focused }
+						)
+					}
                     val total = doc?.items?.size ?: 0
                     val done = doc?.items?.count { (it.status ?: "").lowercase() == "closed" } ?: 0
                     if (total > 0) {
@@ -293,7 +318,18 @@ fun DocScreen(
             }
 
             val itemsList = doc?.items.orEmpty()
-			items(itemsList) { it ->
+			val q = if (isSearchAvailable) searchQuery.trim() else ""
+			val filteredItems = if (q.isBlank()) {
+				itemsList
+			} else {
+				itemsList.filter { it2 ->
+					it2.name.contains(q, ignoreCase = true) ||
+						it2.id.contains(q, ignoreCase = true) ||
+						(it2.statusText?.contains(q, ignoreCase = true) == true) ||
+						((it2.status ?: "").contains(q, ignoreCase = true))
+				}
+			}
+			items(filteredItems) { it ->
 				val bg = statusCardColor(
 					colors = colors,
 					status = it.status,
@@ -421,7 +457,7 @@ fun DocScreen(
                     .alpha(0f)
                     .fillMaxWidth()
                     .height(1.dp),
-                update = { v -> v.post { v.requestFocus() } }
+                update = { v -> v.post { if (!searchFocused) v.requestFocus() } }
             )
         }
 

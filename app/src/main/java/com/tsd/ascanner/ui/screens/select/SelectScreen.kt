@@ -36,6 +36,8 @@ import androidx.compose.ui.unit.dp
 import com.tsd.ascanner.AScannerApp
 import com.tsd.ascanner.ui.components.ServerActionButtons
 import com.tsd.ascanner.ui.components.parseServerIconOrFallback
+import com.tsd.ascanner.ui.components.SearchScanMode
+import com.tsd.ascanner.ui.components.ServerSearchField
 import com.tsd.ascanner.ui.theme.AppTheme
 import com.tsd.ascanner.ui.theme.statusCardColor
 import com.tsd.ascanner.ui.theme.parseHexColorOrNull
@@ -59,6 +61,7 @@ fun SelectScreen(
 	val scope = rememberCoroutineScope()
 	var sending by remember { mutableStateOf(false) }
 	val listState = rememberLazyListState()
+	var searchQuery by remember { mutableStateOf("") }
 
 	Box(modifier = Modifier.fillMaxSize().background(screenBg).padding(paddingValues)) {
 		val payload = select
@@ -68,11 +71,29 @@ fun SelectScreen(
 				color = Color(0xFF30323D)
 			)
 		} else {
-			LaunchedEffect(payload.selectedId, payload.items) {
+			val isSearchAvailable = payload.searchAvailable?.equals("true", ignoreCase = true) == true
+			LaunchedEffect(isSearchAvailable) {
+				if (!isSearchAvailable && searchQuery.isNotBlank()) {
+					searchQuery = ""
+				}
+			}
+			val q = if (isSearchAvailable) searchQuery.trim() else ""
+			val displayedItems = if (q.isBlank()) {
+				payload.items
+			} else {
+				payload.items.filter { it2 ->
+					it2.name.contains(q, ignoreCase = true) ||
+						it2.id.contains(q, ignoreCase = true) ||
+						(it2.comment?.contains(q, ignoreCase = true) == true) ||
+						((it2.status ?: "").contains(q, ignoreCase = true))
+				}
+			}
+
+			LaunchedEffect(payload.selectedId, displayedItems, q) {
 				val selected = payload.selectedId
 				if (selected.isNullOrBlank()) return@LaunchedEffect
 
-				val idx = payload.items.indexOfFirst { it.id == selected }
+				val idx = displayedItems.indexOfFirst { it.id == selected }
 				if (idx < 0) return@LaunchedEffect
 
 				// +1 for the header item at the top
@@ -98,10 +119,42 @@ fun SelectScreen(
 						if (statusText.isNotBlank()) {
 							Text(text = statusText, color = colors.textSecondary, modifier = Modifier.padding(top = 4.dp))
 						}
+						if (isSearchAvailable) {
+							ServerSearchField(
+								visible = true,
+								value = searchQuery,
+								onValueChange = { searchQuery = it },
+								label = "Поиск",
+								scanMode = SearchScanMode.ControlChars,
+								onScan = { code ->
+									scope.launch {
+										try {
+											sending = true
+											when (val res = docsService.scanSelect(code)) {
+												is com.tsd.ascanner.data.docs.ButtonResult.Success -> {
+													// Next screen/state will be driven by server response.
+												}
+												is com.tsd.ascanner.data.docs.ButtonResult.DialogShown -> {
+													// Dialog/select will be shown globally (DialogBus/SelectBus).
+												}
+												is com.tsd.ascanner.data.docs.ButtonResult.Error -> {
+													ErrorBus.emit(res.message)
+												}
+											}
+										} finally {
+											sending = false
+										}
+									}
+								},
+								modifier = Modifier
+									.fillMaxWidth()
+									.padding(top = 8.dp)
+							)
+						}
 					}
 				}
 
-				items(payload.items) { it ->
+				items(displayedItems) { it ->
 					val bg = statusCardColor(
 						colors = colors,
 						status = it.status,

@@ -19,6 +19,7 @@ data class DocListRequest(
 data class DocListResponse(
     @SerializedName("Tasks") val tasks: List<TaskDto> = emptyList(),
 	@SerializedName("Buttons") val buttons: List<ActionButtonDto> = emptyList(),
+	@SerializedName("SearchAvailable") val searchAvailable: String? = null,
 	@SerializedName(value = "BackgroundColor", alternate = ["backgroundColor"]) val backgroundColor: String? = null
 )
 
@@ -55,6 +56,7 @@ data class DocOneResponse(
     @SerializedName("Status") val status: String? = null,
 	@SerializedName(value = "StatusColor", alternate = ["statusColor"]) val statusColor: String? = null,
 	@SerializedName(value = "BackgroundColor", alternate = ["backgroundColor"]) val backgroundColor: String? = null,
+	@SerializedName("SearchAvailable") val searchAvailable: String? = null,
     @SerializedName("Items") val items: List<DocItemDto> = emptyList(),
 	@SerializedName("Buttons") val buttons: List<ActionButtonDto> = emptyList()
 )
@@ -105,6 +107,7 @@ data class PosResponse(
     @SerializedName("Status") val status: String? = null,
 	@SerializedName(value = "StatusColor", alternate = ["statusColor"]) val statusColor: String? = null,
 	@SerializedName(value = "BackgroundColor", alternate = ["backgroundColor"]) val backgroundColor: String? = null,
+	@SerializedName("SearchAvailable") val searchAvailable: String? = null,
     @SerializedName("Items") val items: List<PosItemDto> = emptyList(),
 	@SerializedName("Buttons") val buttons: List<ActionButtonDto> = emptyList()
 )
@@ -143,6 +146,15 @@ data class SelectRequest(
 	@SerializedName("FormId") val formId: String,
 	@SerializedName("Request") val request: String = "select",
 	@SerializedName("SelectedId") val selectedId: String
+)
+
+// Request triggered by scanning into search field on select page
+data class SelectScanRequest(
+	@SerializedName("Bearer") val bearer: String,
+	@SerializedName("Form") val form: String = "select",
+	@SerializedName("FormId") val formId: String = "",
+	@SerializedName("Request") val request: String = "scan",
+	@SerializedName("Text") val text: String
 )
 
 

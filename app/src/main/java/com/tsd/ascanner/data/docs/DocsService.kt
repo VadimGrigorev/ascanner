@@ -390,6 +390,34 @@ class DocsService(
 		}
 	}
 
+	suspend fun scanSelect(text: String): ButtonResult {
+		val bearer = authService.bearer ?: return ButtonResult.Error("Нет токена авторизации")
+		val req = SelectScanRequest(bearer = bearer, formId = "", text = text)
+		return try {
+			val element = apiClient.postForJsonElement("/scan", req, logRequest = true)
+			if (!element.isJsonObject) return ButtonResult.Success
+			val obj = element.asJsonObject
+			val messageType = if (obj.has("MessageType")) obj.get("MessageType").asString else null
+			// Dialog/print/select are handled globally (DialogBus/Print/SelectBus)
+			if (messageType != null && (
+					messageType.equals("dialog", ignoreCase = true) ||
+						messageType.equals("print", ignoreCase = true) ||
+						messageType.equals("select", ignoreCase = true)
+				)
+			) {
+				return ButtonResult.DialogShown
+			}
+			if (messageType != null && messageType.equals("error", ignoreCase = true)) {
+				val msg = if (obj.has("Message")) obj.get("Message").asString else "Ошибка"
+				return ButtonResult.Error(msg)
+			}
+			routeByForm(obj, fallbackForm = "select")
+			ButtonResult.Success
+		} catch (e: Exception) {
+			ButtonResult.Error(e.message ?: "Ошибка запроса")
+		}
+	}
+
     fun clear() {
         currentDoc = null
         currentPos = null
