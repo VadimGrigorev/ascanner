@@ -10,6 +10,8 @@ import com.tsd.ascanner.data.docs.TaskDto
 import com.tsd.ascanner.data.docs.ActionButtonDto
 import com.tsd.ascanner.ui.theme.parseHexColorOrNull
 import com.tsd.ascanner.utils.ServerDialogShownException
+import kotlinx.coroutines.flow.filterNotNull
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 
 class RemoteTasksViewModel(
@@ -36,6 +38,20 @@ class RemoteTasksViewModel(
 
 		// Internal flag to avoid overlapping background refreshes
 		private var isAutoRefreshing: Boolean = false
+
+		init {
+			viewModelScope.launch {
+				docsService.currentDocListFlow
+					.filterNotNull()
+					.collectLatest { resp ->
+						tasks = resp.tasks
+						buttons = resp.buttons
+						if (parseHexColorOrNull(resp.backgroundColor) != null) {
+							backgroundColorHex = resp.backgroundColor
+						}
+					}
+			}
+		}
 
 	fun refresh(userInitiated: Boolean = true) {
 		if (userInitiated) {

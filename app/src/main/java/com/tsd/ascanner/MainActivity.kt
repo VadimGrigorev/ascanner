@@ -179,6 +179,19 @@ class MainActivity : ComponentActivity() {
 									}
 								}
 							}
+							"doclist", "tasks" -> {
+								if (route != "tasks") {
+									navController.navigate("tasks") {
+										if (fromSelect) {
+											popUpTo("select") { inclusive = true }
+										}
+										launchSingleTop = true
+									}
+								} else if (fromSelect) {
+									// Defensive: if nav thinks we're on tasks but select is still on stack, pop it.
+									navController.popBackStack()
+								}
+							}
 						}
 					}
 				}

@@ -58,6 +58,7 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.os.SystemClock
 import com.tsd.ascanner.utils.DataWedge
 import com.tsd.ascanner.utils.ScanTriggerBus
 import kotlinx.coroutines.flow.collectLatest
@@ -204,7 +205,10 @@ fun TasksScreen(
                 if (event == Lifecycle.Event.ON_RESUME) {
                     // При первом показе экрана и возврате на него делаем ручной refresh
                     // с индикатором загрузки, как и раньше.
-                    vm.refresh(userInitiated = true)
+					val nowMs = SystemClock.elapsedRealtime()
+					if (!app.docsService.shouldSkipDocListResumeRefresh(nowMs)) {
+						vm.refresh(userInitiated = true)
+					}
                 }
             }
             lifecycleOwner.lifecycle.addObserver(observer)

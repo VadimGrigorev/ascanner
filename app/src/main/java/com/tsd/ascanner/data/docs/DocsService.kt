@@ -5,6 +5,7 @@ import com.tsd.ascanner.data.net.ApiClient
 import com.google.gson.Gson
 import com.google.gson.JsonObject
 import com.tsd.ascanner.utils.ServerDialogShownException
+import android.os.SystemClock
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
@@ -41,6 +42,17 @@ class DocsService(
 
 	private val _currentPos = MutableStateFlow<PosResponse?>(null)
 	val currentPosFlow = _currentPos.asStateFlow()
+
+	private val _currentDocList = MutableStateFlow<DocListResponse?>(null)
+	val currentDocListFlow = _currentDocList.asStateFlow()
+
+	@Volatile
+	private var lastDocListUpdateAtMs: Long = 0L
+
+	fun shouldSkipDocListResumeRefresh(nowMs: Long, windowMs: Long = 2500): Boolean {
+		val dt = nowMs - lastDocListUpdateAtMs
+		return lastDocListUpdateAtMs > 0L && dt in 0..windowMs
+	}
 
 	/**
 	 * Backward-compatible imperative accessors.
@@ -119,13 +131,26 @@ class DocsService(
 					_navEvents.emit(NavTarget(form = "pos", formId = merged.formId ?: formId))
 				}
 			}
+			// doclist is shown on TasksScreen (route "tasks").
+			// Needed to close global SelectScreen when server returns Form="doclist" on button/select actions.
+			"doclist", "tasks" -> {
+				val docList = Gson().fromJson(obj, DocListResponse::class.java)
+				_currentDocList.value = docList
+				lastDocListUpdateAtMs = SystemClock.elapsedRealtime()
+				if (emitNav) {
+					_navEvents.emit(NavTarget(form = "doclist", formId = formId))
+				}
+			}
 		}
 	}
 
     suspend fun fetchDocs(logRequest: Boolean): DocListResponse {
         val bearer = authService.bearer ?: throw IllegalStateException("Нет токена авторизации")
         val req = DocListRequest(bearer = bearer)
-        return apiClient.postAndParse("/docs", req, DocListResponse::class.java, logRequest = logRequest)
+        val resp = apiClient.postAndParse("/docs", req, DocListResponse::class.java, logRequest = logRequest)
+		_currentDocList.value = resp
+		lastDocListUpdateAtMs = SystemClock.elapsedRealtime()
+		return resp
     }
 
     suspend fun fetchDoc(formId: String, logRequest: Boolean, emitNav: Boolean = true): DocOneResponse {
