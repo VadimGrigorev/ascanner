@@ -40,9 +40,15 @@ import kotlinx.coroutines.launch
 import androidx.compose.foundation.clickable
 import androidx.compose.ui.graphics.Color
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.waitForUpOrCancellation
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.draw.alpha
 import androidx.compose.foundation.layout.height
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.pointerInput
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
@@ -64,7 +70,10 @@ import com.tsd.ascanner.ui.components.ServerSearchField
 import com.tsd.ascanner.ui.theme.statusCardColor
 import com.tsd.ascanner.ui.theme.parseHexColorOrNull
 import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.LayoutCoordinates
+import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalFocusManager
 
 @Composable
 fun DocScreen(
@@ -249,7 +258,34 @@ fun DocScreen(
     }
 
 	val screenBg = parseHexColorOrNull(doc?.backgroundColor) ?: colors.background
-    Box(modifier = Modifier.fillMaxSize().background(screenBg).padding(paddingValues)) {
+	val focusManager = LocalFocusManager.current
+	var rootCoords by remember { mutableStateOf<LayoutCoordinates?>(null) }
+	var searchBoundsInRoot by remember { mutableStateOf<Rect?>(null) }
+	LaunchedEffect(isSearchAvailable) {
+		if (!isSearchAvailable) searchBoundsInRoot = null
+	}
+
+    Box(
+		modifier = Modifier
+			.fillMaxSize()
+			.background(screenBg)
+			.padding(paddingValues)
+			.onGloballyPositioned { rootCoords = it }
+			.pointerInput(rootCoords, searchBoundsInRoot) {
+				awaitEachGesture {
+					val down = awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
+					val root = rootCoords
+					val bounds = searchBoundsInRoot
+					if (root != null && bounds != null) {
+						val downInRoot = root.localToRoot(down.position)
+						if (!bounds.contains(downInRoot)) {
+							focusManager.clearFocus()
+						}
+					}
+					waitForUpOrCancellation()
+				}
+			}
+	) {
 		val serverButtons = doc?.buttons.orEmpty()
 		val showRefreshFab = DebugFlags.REFRESH_BUTTONS_ENABLED
 		val showCameraFab = DebugFlags.CAMERA_SCAN_ENABLED && DebugSession.debugModeEnabled
@@ -282,7 +318,8 @@ fun DocScreen(
 							onScan = { code -> handleScan(code) },
 							modifier = Modifier
 								.fillMaxWidth()
-								.padding(top = 8.dp),
+								.padding(top = 8.dp)
+								.onGloballyPositioned { searchBoundsInRoot = it.boundsInRoot() },
 							onFocusChanged = { focused -> searchFocused = focused }
 						)
 					}

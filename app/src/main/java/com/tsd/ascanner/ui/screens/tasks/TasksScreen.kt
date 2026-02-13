@@ -46,11 +46,20 @@ import com.tsd.ascanner.ui.theme.AppTheme
 import androidx.compose.foundation.layout.Box
 import androidx.compose.ui.graphics.Color
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.waitForUpOrCancellation
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.LayoutCoordinates
+import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalFocusManager
 import kotlinx.coroutines.launch
 import android.content.BroadcastReceiver
 import android.content.Context
@@ -217,7 +226,34 @@ fun TasksScreen(
     }
 
 	val screenBg = parseHexColorOrNull(vm.backgroundColorHex) ?: colors.background
-    Box(modifier = Modifier.fillMaxSize().background(screenBg).padding(paddingValues)) {
+	val focusManager = LocalFocusManager.current
+	var rootCoords by remember { mutableStateOf<LayoutCoordinates?>(null) }
+	var searchBoundsInRoot by remember { mutableStateOf<Rect?>(null) }
+	LaunchedEffect(vm.isSearchAvailable) {
+		if (!vm.isSearchAvailable) searchBoundsInRoot = null
+	}
+
+    Box(
+		modifier = Modifier
+			.fillMaxSize()
+			.background(screenBg)
+			.padding(paddingValues)
+			.onGloballyPositioned { rootCoords = it }
+			.pointerInput(rootCoords, searchBoundsInRoot) {
+				awaitEachGesture {
+					val down = awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
+					val root = rootCoords
+					val bounds = searchBoundsInRoot
+					if (root != null && bounds != null) {
+						val downInRoot = root.localToRoot(down.position)
+						if (!bounds.contains(downInRoot)) {
+							focusManager.clearFocus()
+						}
+					}
+					waitForUpOrCancellation()
+				}
+			}
+	) {
 		val serverButtons = vm.buttons
 		val showRefreshFab = DebugFlags.REFRESH_BUTTONS_ENABLED
 		val showCameraFab = DebugFlags.CAMERA_SCAN_ENABLED && DebugSession.debugModeEnabled
@@ -301,43 +337,47 @@ fun TasksScreen(
                         Text(text = "скрыть завершенные", color = colors.textSecondary)
                     }
 					Spacer(Modifier.height(8.dp))
-					ServerSearchField(
-						visible = vm.isSearchAvailable,
-						value = vm.searchQuery,
-						onValueChange = { vm.updateSearchQuery(it) },
-						label = "Поиск",
-						scanMode = SearchScanMode.Marker("@!@!@NEWDOCUMENT!@!@!"),
-						onScan = { code ->
-							lastScan = code
-							scanError = null
-							scope.launch {
-								try {
-									isRequesting = true
-									when (val res = app.docsService.scanDocList(code)) {
-										is com.tsd.ascanner.data.docs.ScanDocResult.Success -> {
-											isScanning = false
-											val id = res.doc.formId ?: app.docsService.currentDoc?.formId ?: code
-											onOpenDoc(id)
+					if (vm.isSearchAvailable) {
+						ServerSearchField(
+							visible = true,
+							value = vm.searchQuery,
+							onValueChange = { vm.updateSearchQuery(it) },
+							label = "Поиск",
+							scanMode = SearchScanMode.Marker("@!@!@NEWDOCUMENT!@!@!"),
+							onScan = { code ->
+								lastScan = code
+								scanError = null
+								scope.launch {
+									try {
+										isRequesting = true
+										when (val res = app.docsService.scanDocList(code)) {
+											is com.tsd.ascanner.data.docs.ScanDocResult.Success -> {
+												isScanning = false
+												val id = res.doc.formId ?: app.docsService.currentDoc?.formId ?: code
+												onOpenDoc(id)
+											}
+											is com.tsd.ascanner.data.docs.ScanDocResult.Error -> {
+												scanError = res.message
+												isScanning = true
+											}
+											is com.tsd.ascanner.data.docs.ScanDocResult.DialogShown -> {
+												isScanning = false
+											}
 										}
-										is com.tsd.ascanner.data.docs.ScanDocResult.Error -> {
-											scanError = res.message
-											isScanning = true
-										}
-										is com.tsd.ascanner.data.docs.ScanDocResult.DialogShown -> {
-											isScanning = false
-										}
+									} catch (e: Exception) {
+										scanError = e.message ?: "Ошибка запроса"
+										isScanning = true
+									} finally {
+										isRequesting = false
 									}
-								} catch (e: Exception) {
-									scanError = e.message ?: "Ошибка запроса"
-									isScanning = true
-								} finally {
-									isRequesting = false
 								}
-							}
-						},
-						modifier = Modifier.fillMaxWidth(),
-						onFocusChanged = { focused -> searchFocused = focused }
-					)
+							},
+							modifier = Modifier
+								.fillMaxWidth()
+								.onGloballyPositioned { searchBoundsInRoot = it.boundsInRoot() },
+							onFocusChanged = { focused -> searchFocused = focused }
+						)
+					}
                 }
             }
 

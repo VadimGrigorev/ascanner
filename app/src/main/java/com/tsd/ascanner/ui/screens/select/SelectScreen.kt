@@ -4,6 +4,9 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.waitForUpOrCancellation
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -31,7 +34,14 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.LayoutCoordinates
+import androidx.compose.ui.layout.boundsInRoot
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.unit.dp
 import com.tsd.ascanner.AScannerApp
 import com.tsd.ascanner.ui.components.ServerActionButtons
@@ -62,8 +72,31 @@ fun SelectScreen(
 	var sending by remember { mutableStateOf(false) }
 	val listState = rememberLazyListState()
 	var searchQuery by remember { mutableStateOf("") }
+	val focusManager = LocalFocusManager.current
+	var rootCoords by remember { mutableStateOf<LayoutCoordinates?>(null) }
+	var searchBoundsInRoot by remember { mutableStateOf<Rect?>(null) }
 
-	Box(modifier = Modifier.fillMaxSize().background(screenBg).padding(paddingValues)) {
+	Box(
+		modifier = Modifier
+			.fillMaxSize()
+			.background(screenBg)
+			.padding(paddingValues)
+			.onGloballyPositioned { rootCoords = it }
+			.pointerInput(rootCoords, searchBoundsInRoot) {
+				awaitEachGesture {
+					val down = awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
+					val root = rootCoords
+					val bounds = searchBoundsInRoot
+					if (root != null && bounds != null) {
+						val downInRoot = root.localToRoot(down.position)
+						if (!bounds.contains(downInRoot)) {
+							focusManager.clearFocus()
+						}
+					}
+					waitForUpOrCancellation()
+				}
+			}
+	) {
 		val payload = select
 		if (payload == null) {
 			CircularProgressIndicator(
@@ -76,6 +109,7 @@ fun SelectScreen(
 				if (!isSearchAvailable && searchQuery.isNotBlank()) {
 					searchQuery = ""
 				}
+				if (!isSearchAvailable) searchBoundsInRoot = null
 			}
 			val q = if (isSearchAvailable) searchQuery.trim() else ""
 			val displayedItems = if (q.isBlank()) {
@@ -149,6 +183,7 @@ fun SelectScreen(
 								modifier = Modifier
 									.fillMaxWidth()
 									.padding(top = 8.dp)
+									.onGloballyPositioned { searchBoundsInRoot = it.boundsInRoot() }
 							)
 						}
 					}
