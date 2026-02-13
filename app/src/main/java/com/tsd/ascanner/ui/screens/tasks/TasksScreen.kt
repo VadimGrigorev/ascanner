@@ -517,7 +517,8 @@ fun TasksScreen(
 										requestType = "button"
 									)) {
 										is com.tsd.ascanner.data.docs.ButtonResult.Success -> {
-											vm.refresh(userInitiated = false)
+											// Do not force-refresh doclist here.
+											// TasksScreen already has periodic refresh and ON_RESUME refresh.
 										}
 										is com.tsd.ascanner.data.docs.ButtonResult.DialogShown -> {
 											// Dialog will be shown via DialogBus
