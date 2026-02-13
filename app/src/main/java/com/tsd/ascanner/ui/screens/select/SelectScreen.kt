@@ -42,6 +42,8 @@ import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.viewinterop.AndroidView
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.unit.dp
 import com.tsd.ascanner.AScannerApp
 import com.tsd.ascanner.ui.components.ServerActionButtons
@@ -56,6 +58,7 @@ import com.tsd.ascanner.utils.ServerSelect
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.first
+import androidx.compose.foundation.layout.height
 
 @Composable
 fun SelectScreen(
@@ -75,6 +78,31 @@ fun SelectScreen(
 	val focusManager = LocalFocusManager.current
 	var rootCoords by remember { mutableStateOf<LayoutCoordinates?>(null) }
 	var searchBoundsInRoot by remember { mutableStateOf<Rect?>(null) }
+	var searchFocused by remember { mutableStateOf(false) }
+
+	fun handleScan(raw: String) {
+		val code = raw.trim()
+		if (code.isBlank()) return
+		if (sending) return
+		scope.launch {
+			try {
+				sending = true
+				when (val res = docsService.scanSelect(code)) {
+					is com.tsd.ascanner.data.docs.ButtonResult.Success -> {
+						// Next screen/state will be driven by server response.
+					}
+					is com.tsd.ascanner.data.docs.ButtonResult.DialogShown -> {
+						// Dialog/select will be shown globally (DialogBus/SelectBus).
+					}
+					is com.tsd.ascanner.data.docs.ButtonResult.Error -> {
+						ErrorBus.emit(res.message)
+					}
+				}
+			} finally {
+				sending = false
+			}
+		}
+	}
 
 	Box(
 		modifier = Modifier
@@ -104,6 +132,67 @@ fun SelectScreen(
 				color = Color(0xFF30323D)
 			)
 		} else {
+			// Always-on hidden input to catch wedge/scanner text even without focusing search field
+			AndroidView(
+				factory = { ctx2 ->
+					val editText = android.widget.EditText(ctx2).apply {
+						setShowSoftInputOnFocus(false)
+						isSingleLine = true
+						isFocusable = true
+						isFocusableInTouchMode = true
+						inputType = android.text.InputType.TYPE_CLASS_TEXT or
+							android.text.InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD or
+							android.text.InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS
+						imeOptions = android.view.inputmethod.EditorInfo.IME_FLAG_NO_EXTRACT_UI or
+							android.view.inputmethod.EditorInfo.IME_FLAG_NO_FULLSCREEN
+					}
+					var debounceJob: kotlinx.coroutines.Job? = null
+					val watcher = object : android.text.TextWatcher {
+						override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+						override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
+						override fun afterTextChanged(s: android.text.Editable?) {
+							val text = s?.toString() ?: return
+							val idx = text.indexOfFirst { ch ->
+								val code = ch.code
+								((code in 0x00..0x1F) && code != 0x1D) || code == 0x7F
+							}
+							if (idx >= 0) {
+								val code = text.substring(0, idx).trim()
+								if (code.isNotEmpty()) handleScan(code)
+								editText.setText("")
+							} else {
+								debounceJob?.cancel()
+								debounceJob = scope.launch {
+									kotlinx.coroutines.delay(120)
+									val code = editText.text.toString().trim()
+									if (code.isNotEmpty()) {
+										handleScan(code)
+										editText.setText("")
+									}
+								}
+							}
+						}
+					}
+					editText.addTextChangedListener(watcher)
+					editText.setOnKeyListener { _, keyCode, event ->
+						if (event.action == android.view.KeyEvent.ACTION_UP &&
+							(keyCode == android.view.KeyEvent.KEYCODE_ENTER || keyCode == android.view.KeyEvent.KEYCODE_TAB)
+						) {
+							val code = editText.text.toString().trim()
+							if (code.isNotEmpty()) handleScan(code)
+							editText.setText("")
+							true
+						} else false
+					}
+					editText
+				},
+				modifier = Modifier
+					.alpha(0f)
+					.fillMaxWidth()
+					.height(1.dp),
+				update = { v -> v.post { if (!searchFocused) v.requestFocus() } }
+			)
+
 			val isSearchAvailable = payload.searchAvailable?.equals("true", ignoreCase = true) == true
 			LaunchedEffect(isSearchAvailable) {
 				if (!isSearchAvailable && searchQuery.isNotBlank()) {
@@ -160,30 +249,13 @@ fun SelectScreen(
 								onValueChange = { searchQuery = it },
 								label = "Поиск",
 								scanMode = SearchScanMode.ControlChars,
-								onScan = { code ->
-									scope.launch {
-										try {
-											sending = true
-											when (val res = docsService.scanSelect(code)) {
-												is com.tsd.ascanner.data.docs.ButtonResult.Success -> {
-													// Next screen/state will be driven by server response.
-												}
-												is com.tsd.ascanner.data.docs.ButtonResult.DialogShown -> {
-													// Dialog/select will be shown globally (DialogBus/SelectBus).
-												}
-												is com.tsd.ascanner.data.docs.ButtonResult.Error -> {
-													ErrorBus.emit(res.message)
-												}
-											}
-										} finally {
-											sending = false
-										}
-									}
-								},
+								onScan = { code -> handleScan(code) },
 								modifier = Modifier
 									.fillMaxWidth()
 									.padding(top = 8.dp)
 									.onGloballyPositioned { searchBoundsInRoot = it.boundsInRoot() }
+								,
+								onFocusChanged = { focused -> searchFocused = focused }
 							)
 						}
 					}
