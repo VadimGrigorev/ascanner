@@ -14,17 +14,20 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -39,6 +42,8 @@ import com.tsd.ascanner.ui.theme.parseHexColorOrNull
 import com.tsd.ascanner.utils.ErrorBus
 import com.tsd.ascanner.utils.ServerSelect
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.filter
+import kotlinx.coroutines.flow.first
 
 @Composable
 fun SelectScreen(
@@ -53,6 +58,7 @@ fun SelectScreen(
 	val screenBg = parseHexColorOrNull(select?.backgroundColor) ?: colors.background
 	val scope = rememberCoroutineScope()
 	var sending by remember { mutableStateOf(false) }
+	val listState = rememberLazyListState()
 
 	Box(modifier = Modifier.fillMaxSize().background(screenBg).padding(paddingValues)) {
 		val payload = select
@@ -62,7 +68,28 @@ fun SelectScreen(
 				color = Color(0xFF30323D)
 			)
 		} else {
-			LazyColumn(modifier = Modifier.fillMaxSize()) {
+			LaunchedEffect(payload.selectedId, payload.items) {
+				val selected = payload.selectedId
+				if (selected.isNullOrBlank()) return@LaunchedEffect
+
+				val idx = payload.items.indexOfFirst { it.id == selected }
+				if (idx < 0) return@LaunchedEffect
+
+				// +1 for the header item at the top
+				val targetIndex = idx + 1
+
+				// Wait until LazyColumn is measured and contains enough items.
+				snapshotFlow { listState.layoutInfo.totalItemsCount }
+					.filter { total -> targetIndex in 0 until total }
+					.first()
+
+				listState.animateScrollToItem(targetIndex)
+			}
+
+			LazyColumn(
+				modifier = Modifier.fillMaxSize(),
+				state = listState
+			) {
 				item {
 					Column(modifier = Modifier.padding(12.dp)) {
 						val header = payload.headerText ?: ""
