@@ -96,11 +96,31 @@ fun SelectScreen(
 	var searchBoundsInRoot by remember { mutableStateOf<Rect?>(null) }
 	var searchFocused by remember { mutableStateOf(false) }
 	var lastScan by remember { mutableStateOf<String?>(null) }
+	var scanInputView by remember { mutableStateOf<android.widget.EditText?>(null) }
+
+	fun requestScanInputFocus() {
+		// Hardware scanners often behave like keyboard input: without a focused view,
+		// the scan can be "typed" nowhere. On this screen we don't have periodic recompositions,
+		// so we re-request focus explicitly after focus clears / requests finish.
+		val v = scanInputView ?: return
+		v.post {
+			if (!searchFocused && !showCamera) {
+				v.requestFocus()
+				// Keep cursor at end to avoid selecting old text in rare cases.
+				v.setSelection(v.text?.length ?: 0)
+			}
+		}
+	}
 
 	LaunchedEffect(lastScan) {
 		if (!lastScan.isNullOrBlank()) {
 			kotlinx.coroutines.delay(5000)
 			lastScan = null
+		}
+	}
+	LaunchedEffect(sending, searchFocused, showCamera) {
+		if (!sending && !searchFocused && !showCamera) {
+			requestScanInputFocus()
 		}
 	}
 
@@ -144,6 +164,7 @@ fun SelectScreen(
 						val downInRoot = root.localToRoot(down.position)
 						if (!bounds.contains(downInRoot)) {
 							focusManager.clearFocus()
+							requestScanInputFocus()
 						}
 					}
 					waitForUpOrCancellation()
@@ -181,6 +202,8 @@ fun SelectScreen(
 						imeOptions = android.view.inputmethod.EditorInfo.IME_FLAG_NO_EXTRACT_UI or
 							android.view.inputmethod.EditorInfo.IME_FLAG_NO_FULLSCREEN
 					}
+					scanInputView = editText
+					editText.post { if (!searchFocused) editText.requestFocus() }
 					var debounceJob: kotlinx.coroutines.Job? = null
 					val watcher = object : android.text.TextWatcher {
 						override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
@@ -225,7 +248,10 @@ fun SelectScreen(
 					.alpha(0f)
 					.fillMaxWidth()
 					.height(1.dp),
-				update = { v -> v.post { if (!searchFocused) v.requestFocus() } }
+				update = { v ->
+					if (scanInputView !== v) scanInputView = v
+					v.post { if (!searchFocused && !showCamera) v.requestFocus() }
+				}
 			)
 
 			val isSearchAvailable = payload.searchAvailable?.equals("true", ignoreCase = true) == true
