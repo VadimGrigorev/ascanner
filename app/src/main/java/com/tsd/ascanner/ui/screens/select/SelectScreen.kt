@@ -27,6 +27,11 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.PhotoCamera
+import androidx.compose.material.icons.outlined.QrCodeScanner
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -90,16 +95,24 @@ fun SelectScreen(
 	var rootCoords by remember { mutableStateOf<LayoutCoordinates?>(null) }
 	var searchBoundsInRoot by remember { mutableStateOf<Rect?>(null) }
 	var searchFocused by remember { mutableStateOf(false) }
+	var lastScan by remember { mutableStateOf<String?>(null) }
 
-	fun handleScan(form: String, raw: String) {
+	LaunchedEffect(lastScan) {
+		if (!lastScan.isNullOrBlank()) {
+			kotlinx.coroutines.delay(5000)
+			lastScan = null
+		}
+	}
+
+	fun handleScan(form: String, formId: String, raw: String) {
 		val code = raw.trim()
 		if (code.isBlank()) return
 		if (sending) return
+		lastScan = code
 		scope.launch {
 			try {
 				sending = true
-				// IMPORTANT: for scan initiated from SelectScreen we intentionally send empty FormId (legacy protocol).
-				when (val res = docsService.scanSelect(form = form, formId = "", text = code)) {
+				when (val res = docsService.scanSelect(form = form, formId = formId, text = code)) {
 					is com.tsd.ascanner.data.docs.ButtonResult.Success -> {
 						// Next screen/state will be driven by server response.
 					}
@@ -152,6 +165,7 @@ fun SelectScreen(
 			}
 			val bottomPaddingDp = with(density) { bottomActionsHeightPx.toDp() } + 8.dp
 			val contextForm = rememberUpdatedState(payload.form)
+			val contextFormId = rememberUpdatedState(payload.formId)
 
 			// Always-on hidden input to catch wedge/scanner text even without focusing search field
 			AndroidView(
@@ -179,7 +193,7 @@ fun SelectScreen(
 							}
 							if (idx >= 0) {
 								val code = text.substring(0, idx).trim()
-								if (code.isNotEmpty()) handleScan(contextForm.value, code)
+								if (code.isNotEmpty()) handleScan(contextForm.value, contextFormId.value, code)
 								editText.setText("")
 							} else {
 								debounceJob?.cancel()
@@ -187,7 +201,7 @@ fun SelectScreen(
 									kotlinx.coroutines.delay(120)
 									val code = editText.text.toString().trim()
 									if (code.isNotEmpty()) {
-										handleScan(contextForm.value, code)
+										handleScan(contextForm.value, contextFormId.value, code)
 										editText.setText("")
 									}
 								}
@@ -200,7 +214,7 @@ fun SelectScreen(
 							(keyCode == android.view.KeyEvent.KEYCODE_ENTER || keyCode == android.view.KeyEvent.KEYCODE_TAB)
 						) {
 							val code = editText.text.toString().trim()
-							if (code.isNotEmpty()) handleScan(contextForm.value, code)
+							if (code.isNotEmpty()) handleScan(contextForm.value, contextFormId.value, code)
 							editText.setText("")
 							true
 						} else false
@@ -271,7 +285,7 @@ fun SelectScreen(
 								onValueChange = { searchQuery = it },
 								label = "Поиск",
 								scanMode = SearchScanMode.ControlChars,
-								onScan = { code -> handleScan(payload.form, code) },
+								onScan = { code -> handleScan(payload.form, payload.formId, code) },
 								modifier = Modifier
 									.fillMaxWidth()
 									.padding(top = 8.dp)
@@ -418,9 +432,43 @@ fun SelectScreen(
 			if (showCameraFab) {
 				CameraScannerOverlay(
 					visible = showCamera,
-					onResult = { code -> handleScan(payload.form, code) },
+					onResult = { code -> handleScan(payload.form, payload.formId, code) },
 					onClose = { showCamera = false }
 				)
+			}
+		}
+
+		// Floating scan message at bottom; auto hides after 5s
+		if (!lastScan.isNullOrBlank()) {
+			Card(
+				modifier = Modifier
+					.align(Alignment.BottomCenter)
+					.fillMaxWidth()
+					.padding(horizontal = 12.dp, vertical = 8.dp)
+					.clickable { lastScan = null },
+				shape = RoundedCornerShape(12.dp),
+				colors = CardDefaults.cardColors(
+					containerColor = Color(0xFFE65100)
+				),
+				elevation = CardDefaults.cardElevation(defaultElevation = 6.dp)
+			) {
+				Row(
+					modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+					verticalAlignment = Alignment.CenterVertically
+				) {
+					Icon(
+						Icons.Outlined.QrCodeScanner,
+						contentDescription = null,
+						tint = Color.White
+					)
+					Spacer(Modifier.width(10.dp))
+					Text(
+						text = lastScan ?: "",
+						color = Color.White,
+						style = MaterialTheme.typography.bodyMedium,
+						fontWeight = FontWeight.SemiBold
+					)
+				}
 			}
 		}
 
