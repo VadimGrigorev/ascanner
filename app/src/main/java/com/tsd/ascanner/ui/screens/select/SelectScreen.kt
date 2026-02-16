@@ -33,6 +33,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -90,14 +91,15 @@ fun SelectScreen(
 	var searchBoundsInRoot by remember { mutableStateOf<Rect?>(null) }
 	var searchFocused by remember { mutableStateOf(false) }
 
-	fun handleScan(raw: String) {
+	fun handleScan(form: String, raw: String) {
 		val code = raw.trim()
 		if (code.isBlank()) return
 		if (sending) return
 		scope.launch {
 			try {
 				sending = true
-				when (val res = docsService.scanSelect(code)) {
+				// IMPORTANT: for scan initiated from SelectScreen we intentionally send empty FormId (legacy protocol).
+				when (val res = docsService.scanSelect(form = form, formId = "", text = code)) {
 					is com.tsd.ascanner.data.docs.ButtonResult.Success -> {
 						// Next screen/state will be driven by server response.
 					}
@@ -149,6 +151,7 @@ fun SelectScreen(
 				if (!hasBottomActions) bottomActionsHeightPx = 0
 			}
 			val bottomPaddingDp = with(density) { bottomActionsHeightPx.toDp() } + 8.dp
+			val contextForm = rememberUpdatedState(payload.form)
 
 			// Always-on hidden input to catch wedge/scanner text even without focusing search field
 			AndroidView(
@@ -176,7 +179,7 @@ fun SelectScreen(
 							}
 							if (idx >= 0) {
 								val code = text.substring(0, idx).trim()
-								if (code.isNotEmpty()) handleScan(code)
+								if (code.isNotEmpty()) handleScan(contextForm.value, code)
 								editText.setText("")
 							} else {
 								debounceJob?.cancel()
@@ -184,7 +187,7 @@ fun SelectScreen(
 									kotlinx.coroutines.delay(120)
 									val code = editText.text.toString().trim()
 									if (code.isNotEmpty()) {
-										handleScan(code)
+										handleScan(contextForm.value, code)
 										editText.setText("")
 									}
 								}
@@ -197,7 +200,7 @@ fun SelectScreen(
 							(keyCode == android.view.KeyEvent.KEYCODE_ENTER || keyCode == android.view.KeyEvent.KEYCODE_TAB)
 						) {
 							val code = editText.text.toString().trim()
-							if (code.isNotEmpty()) handleScan(code)
+							if (code.isNotEmpty()) handleScan(contextForm.value, code)
 							editText.setText("")
 							true
 						} else false
@@ -268,7 +271,7 @@ fun SelectScreen(
 								onValueChange = { searchQuery = it },
 								label = "Поиск",
 								scanMode = SearchScanMode.ControlChars,
-								onScan = { code -> handleScan(code) },
+								onScan = { code -> handleScan(payload.form, code) },
 								modifier = Modifier
 									.fillMaxWidth()
 									.padding(top = 8.dp)
@@ -415,7 +418,7 @@ fun SelectScreen(
 			if (showCameraFab) {
 				CameraScannerOverlay(
 					visible = showCamera,
-					onResult = { code -> handleScan(code) },
+					onResult = { code -> handleScan(payload.form, code) },
 					onClose = { showCamera = false }
 				)
 			}

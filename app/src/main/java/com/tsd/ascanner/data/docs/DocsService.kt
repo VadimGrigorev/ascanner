@@ -390,9 +390,15 @@ class DocsService(
 		}
 	}
 
-	suspend fun scanSelect(text: String): ButtonResult {
+	/**
+	 * Scan request initiated from the global select screen.
+	 *
+	 * IMPORTANT: [form]/[formId] must refer to the form that opened the select screen
+	 * (same as for button/select actions), not to the select screen itself.
+	 */
+	suspend fun scanSelect(form: String, formId: String, text: String): ButtonResult {
 		val bearer = authService.bearer ?: return ButtonResult.Error("Нет токена авторизации")
-		val req = SelectScanRequest(bearer = bearer, formId = "", text = text)
+		val req = SelectScanRequest(bearer = bearer, form = form, formId = formId, text = text)
 		return try {
 			val element = apiClient.postForJsonElement("/scan", req, logRequest = true)
 			if (!element.isJsonObject) return ButtonResult.Success
@@ -416,6 +422,14 @@ class DocsService(
 		} catch (e: Exception) {
 			ButtonResult.Error(e.message ?: "Ошибка запроса")
 		}
+	}
+
+	/**
+	 * Backward-compatible wrapper.
+	 * Prefer [scanSelect(form, formId, text)] from SelectScreen.
+	 */
+	suspend fun scanSelect(text: String): ButtonResult {
+		return scanSelect(form = "select", formId = "", text = text)
 	}
 
     fun clear() {
