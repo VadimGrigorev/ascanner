@@ -153,7 +153,7 @@ data class SelectScanRequest(
 	@SerializedName("Bearer") val bearer: String,
 	@SerializedName("Form") val form: String = "select",
 	@SerializedName("FormId") val formId: String = "",
-	@SerializedName("Request") val request: String = "scan",
+	@SerializedName("Request") val request: String = "selectscan",
 	@SerializedName("Text") val text: String
 )
 
