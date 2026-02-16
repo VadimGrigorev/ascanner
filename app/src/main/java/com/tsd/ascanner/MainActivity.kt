@@ -64,6 +64,16 @@ import androidx.compose.material3.CircularProgressIndicator
 import com.tsd.ascanner.ui.theme.statusCardColor
 import com.tsd.ascanner.ui.theme.parseHexColorOrNull
 import com.tsd.ascanner.ui.screens.select.SelectScreen
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Warning
+import androidx.compose.material3.Icon
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.material3.MaterialTheme
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -251,23 +261,42 @@ class MainActivity : ComponentActivity() {
                         val err = globalError
                         LaunchedEffect(err) {
                             if (err != null) {
-                                delay(15000)
+                                delay(10000)
                                 if (globalError == err) {
                                     globalError = null
                                 }
                             }
                         }
                         if (err != null) {
-                            Column(
+                            Card(
                                 modifier = Modifier
                                     .align(Alignment.TopCenter)
                                     .fillMaxWidth()
-                                    .padding(8.dp)
-                                    .background(Color(0xFFFFCDD2))
-                                    .clickable { globalError = null }
-                                    .padding(10.dp)
+                                    .padding(horizontal = 12.dp, vertical = 8.dp)
+                                    .clickable { globalError = null },
+                                shape = RoundedCornerShape(12.dp),
+                                colors = CardDefaults.cardColors(
+                                    containerColor = Color(0xFFD32F2F)
+                                ),
+                                elevation = CardDefaults.cardElevation(defaultElevation = 6.dp)
                             ) {
-                                Text(text = err, color = Color.Red)
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(
+                                        Icons.Rounded.Warning,
+                                        contentDescription = null,
+                                        tint = Color.White
+                                    )
+                                    Spacer(Modifier.width(10.dp))
+                                    Text(
+                                        text = err,
+                                        color = Color.White,
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        fontWeight = FontWeight.SemiBold
+                                    )
+                                }
                             }
                         }
 

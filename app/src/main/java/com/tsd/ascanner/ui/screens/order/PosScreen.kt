@@ -65,6 +65,10 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material.icons.outlined.PhotoCamera
+import androidx.compose.material.icons.outlined.QrCodeScanner
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.text.font.FontWeight
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
@@ -108,7 +112,7 @@ fun PosScreen(
     LaunchedEffect(lastScan.value) {
         val hasText = !lastScan.value.isNullOrBlank()
         if (hasText) {
-            kotlinx.coroutines.delay(15000)
+            kotlinx.coroutines.delay(5000)
             lastScan.value = null
         }
     }
@@ -433,19 +437,36 @@ fun PosScreen(
             }
         }
 
-        // Floating scan message at bottom; auto hides after 3s
+        // Floating scan message at bottom; auto hides after 15s
         if (!lastScan.value.isNullOrBlank()) {
-            Column(
+            Card(
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
                     .fillMaxWidth()
-                    .padding(8.dp)
-                    .background(Color(0xFFFFF59D))
-                    .padding(10.dp)
+                    .padding(horizontal = 12.dp, vertical = 8.dp)
+                    .clickable { lastScan.value = null },
+                shape = RoundedCornerShape(12.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = Color(0xFFE65100)
+                ),
+                elevation = CardDefaults.cardElevation(defaultElevation = 6.dp)
             ) {
-                val last = lastScan.value
-                if (!last.isNullOrBlank()) {
-                    Text(text = last, color = Color.Black)
+                Row(
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        Icons.Outlined.QrCodeScanner,
+                        contentDescription = null,
+                        tint = Color.White
+                    )
+                    Spacer(Modifier.width(10.dp))
+                    Text(
+                        text = lastScan.value ?: "",
+                        color = Color.White,
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.SemiBold
+                    )
                 }
             }
         }

@@ -29,6 +29,9 @@ import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material.icons.outlined.PhotoCamera
+import androidx.compose.material.icons.outlined.QrCodeScanner
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -147,7 +150,7 @@ fun TasksScreen(
     LaunchedEffect(lastScan) {
         val hasText = !lastScan.isNullOrBlank()
         if (hasText) {
-            kotlinx.coroutines.delay(15000)
+            kotlinx.coroutines.delay(5000)
             lastScan = null
         }
     }
@@ -496,19 +499,36 @@ fun TasksScreen(
             }
         }
 
-        // Floating scan message at bottom; auto hides after 3s
+        // Floating scan message at bottom; auto hides after 15s
         if (!lastScan.isNullOrBlank()) {
-            Column(
+            Card(
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
                     .fillMaxWidth()
-                    .padding(8.dp)
-                    .background(Color(0xFFFFF59D))
-                    .padding(10.dp)
+                    .padding(horizontal = 12.dp, vertical = 8.dp)
+                    .clickable { lastScan = null },
+                shape = RoundedCornerShape(12.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = Color(0xFFE65100)
+                ),
+                elevation = CardDefaults.cardElevation(defaultElevation = 6.dp)
             ) {
-                val last = lastScan
-                if (!last.isNullOrBlank()) {
-                    Text(text = last, color = Color.Black)
+                Row(
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        Icons.Outlined.QrCodeScanner,
+                        contentDescription = null,
+                        tint = Color.White
+                    )
+                    Spacer(Modifier.width(10.dp))
+                    Text(
+                        text = lastScan ?: "",
+                        color = Color.White,
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.SemiBold
+                    )
                 }
             }
         }

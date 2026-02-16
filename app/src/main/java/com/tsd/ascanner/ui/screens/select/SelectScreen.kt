@@ -22,8 +22,11 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
+import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.PhotoCamera
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -42,10 +45,12 @@ import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.unit.dp
 import com.tsd.ascanner.AScannerApp
+import com.tsd.ascanner.ui.components.CameraScannerOverlay
 import com.tsd.ascanner.ui.components.ServerActionButtons
 import com.tsd.ascanner.ui.components.parseServerIconOrFallback
 import com.tsd.ascanner.ui.components.SearchScanMode
@@ -53,6 +58,8 @@ import com.tsd.ascanner.ui.components.ServerSearchField
 import com.tsd.ascanner.ui.theme.AppTheme
 import com.tsd.ascanner.ui.theme.statusCardColor
 import com.tsd.ascanner.ui.theme.parseHexColorOrNull
+import com.tsd.ascanner.utils.DebugFlags
+import com.tsd.ascanner.utils.DebugSession
 import com.tsd.ascanner.utils.ErrorBus
 import com.tsd.ascanner.utils.ServerSelect
 import kotlinx.coroutines.launch
@@ -72,7 +79,10 @@ fun SelectScreen(
 	val colors = AppTheme.colors
 	val screenBg = parseHexColorOrNull(select?.backgroundColor) ?: colors.background
 	val scope = rememberCoroutineScope()
+	val density = LocalDensity.current
+	var bottomActionsHeightPx by remember { mutableStateOf(0) }
 	var sending by remember { mutableStateOf(false) }
+	var showCamera by remember { mutableStateOf(false) }
 	val listState = rememberLazyListState()
 	var searchQuery by remember { mutableStateOf("") }
 	val focusManager = LocalFocusManager.current
@@ -132,6 +142,14 @@ fun SelectScreen(
 				color = Color(0xFF30323D)
 			)
 		} else {
+			val showCameraFab = DebugFlags.CAMERA_SCAN_ENABLED && DebugSession.debugModeEnabled
+			val serverButtons = payload.buttons
+			val hasBottomActions = serverButtons.isNotEmpty() || showCameraFab
+			LaunchedEffect(hasBottomActions) {
+				if (!hasBottomActions) bottomActionsHeightPx = 0
+			}
+			val bottomPaddingDp = with(density) { bottomActionsHeightPx.toDp() } + 8.dp
+
 			// Always-on hidden input to catch wedge/scanner text even without focusing search field
 			AndroidView(
 				factory = { ctx2 ->
@@ -232,7 +250,8 @@ fun SelectScreen(
 
 			LazyColumn(
 				modifier = Modifier.fillMaxSize(),
-				state = listState
+				state = listState,
+				contentPadding = PaddingValues(bottom = bottomPaddingDp)
 			) {
 				item {
 					Column(modifier = Modifier.padding(12.dp)) {
@@ -338,44 +357,67 @@ fun SelectScreen(
 				}
 			}
 
-			// Optional server buttons (same behavior as on other screens)
-			val serverButtons = payload.buttons
-			if (serverButtons.isNotEmpty()) {
+			// Bottom-right actions column: server buttons (above) and camera (below if enabled)
+			if (hasBottomActions) {
 				Column(
 					modifier = Modifier
 						.align(Alignment.BottomEnd)
-						.padding(16.dp),
+						.padding(16.dp)
+						.onGloballyPositioned { coords ->
+							val h = coords.size.height
+							if (bottomActionsHeightPx != h) bottomActionsHeightPx = h
+						},
 					horizontalAlignment = Alignment.End,
 					verticalArrangement = Arrangement.spacedBy(12.dp)
 				) {
-					ServerActionButtons(
-						buttons = serverButtons,
-						enabled = !sending,
-						onClick = { b ->
-							scope.launch {
-								try {
-									sending = true
-									when (val res = docsService.sendButton(
-										form = payload.form,
-										formId = payload.formId,
-										buttonId = b.id,
-										requestType = "button"
-									)) {
-										is com.tsd.ascanner.data.docs.ButtonResult.Success -> {
+					if (serverButtons.isNotEmpty()) {
+						ServerActionButtons(
+							buttons = serverButtons,
+							enabled = !sending,
+							onClick = { b ->
+								scope.launch {
+									try {
+										sending = true
+										when (val res = docsService.sendButton(
+											form = payload.form,
+											formId = payload.formId,
+											buttonId = b.id,
+											requestType = "button"
+										)) {
+											is com.tsd.ascanner.data.docs.ButtonResult.Success -> {
+											}
+											is com.tsd.ascanner.data.docs.ButtonResult.DialogShown -> {
+											}
+											is com.tsd.ascanner.data.docs.ButtonResult.Error -> {
+												ErrorBus.emit(res.message)
+											}
 										}
-										is com.tsd.ascanner.data.docs.ButtonResult.DialogShown -> {
-										}
-										is com.tsd.ascanner.data.docs.ButtonResult.Error -> {
-											ErrorBus.emit(res.message)
-										}
+									} finally {
+										sending = false
 									}
-								} finally {
-									sending = false
 								}
 							}
+						)
+					}
+					if (showCameraFab) {
+						FloatingActionButton(
+							onClick = { showCamera = true },
+							containerColor = colors.secondary,
+							contentColor = colors.textPrimary
+						) {
+							Icon(imageVector = Icons.Outlined.PhotoCamera, contentDescription = "Сканировать камерой")
 						}
-					)
+					}
 				}
+			}
+
+			// Camera overlay
+			if (showCameraFab) {
+				CameraScannerOverlay(
+					visible = showCamera,
+					onResult = { code -> handleScan(code) },
+					onClose = { showCamera = false }
+				)
 			}
 		}
 
