@@ -45,6 +45,7 @@ import androidx.compose.ui.Alignment
 import kotlinx.coroutines.launch
 import androidx.compose.foundation.clickable
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
@@ -426,6 +427,8 @@ fun DocScreen(
 
         // Floating scan message at bottom; auto hides after 15s
         if (!lastScan.value.isNullOrBlank()) {
+            val scanBg = colors.statusWarningBg
+            val scanFg = if (scanBg.luminance() < 0.45f) Color.White else Color.Black
             Card(
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
@@ -434,7 +437,7 @@ fun DocScreen(
                     .clickable { lastScan.value = null },
                 shape = RoundedCornerShape(12.dp),
                 colors = CardDefaults.cardColors(
-                    containerColor = Color(0xFFE65100)
+                    containerColor = scanBg
                 ),
                 elevation = CardDefaults.cardElevation(defaultElevation = 6.dp)
             ) {
@@ -445,12 +448,12 @@ fun DocScreen(
                     Icon(
                         Icons.Outlined.QrCodeScanner,
                         contentDescription = null,
-                        tint = Color.White
+                        tint = scanFg
                     )
                     Spacer(Modifier.width(10.dp))
                     Text(
                         text = lastScan.value ?: "",
-                        color = Color.White,
+                        color = scanFg,
                         style = MaterialTheme.typography.bodyMedium,
                         fontWeight = FontWeight.SemiBold
                     )

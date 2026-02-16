@@ -37,6 +37,7 @@ import com.tsd.ascanner.AScannerApp
 import com.tsd.ascanner.ui.theme.AppTheme
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
@@ -439,6 +440,8 @@ fun PosScreen(
 
         // Floating scan message at bottom; auto hides after 15s
         if (!lastScan.value.isNullOrBlank()) {
+            val scanBg = colors.statusWarningBg
+            val scanFg = if (scanBg.luminance() < 0.45f) Color.White else Color.Black
             Card(
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
@@ -447,7 +450,7 @@ fun PosScreen(
                     .clickable { lastScan.value = null },
                 shape = RoundedCornerShape(12.dp),
                 colors = CardDefaults.cardColors(
-                    containerColor = Color(0xFFE65100)
+                    containerColor = scanBg
                 ),
                 elevation = CardDefaults.cardElevation(defaultElevation = 6.dp)
             ) {
@@ -458,12 +461,12 @@ fun PosScreen(
                     Icon(
                         Icons.Outlined.QrCodeScanner,
                         contentDescription = null,
-                        tint = Color.White
+                        tint = scanFg
                     )
                     Spacer(Modifier.width(10.dp))
                     Text(
                         text = lastScan.value ?: "",
-                        color = Color.White,
+                        color = scanFg,
                         style = MaterialTheme.typography.bodyMedium,
                         fontWeight = FontWeight.SemiBold
                     )

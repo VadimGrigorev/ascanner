@@ -45,6 +45,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.LayoutCoordinates
@@ -466,6 +467,8 @@ fun SelectScreen(
 
 		// Floating scan message at bottom; auto hides after 5s
 		if (!lastScan.isNullOrBlank()) {
+			val scanBg = colors.statusWarningBg
+			val scanFg = if (scanBg.luminance() < 0.45f) Color.White else Color.Black
 			Card(
 				modifier = Modifier
 					.align(Alignment.BottomCenter)
@@ -474,7 +477,7 @@ fun SelectScreen(
 					.clickable { lastScan = null },
 				shape = RoundedCornerShape(12.dp),
 				colors = CardDefaults.cardColors(
-					containerColor = Color(0xFFE65100)
+					containerColor = scanBg
 				),
 				elevation = CardDefaults.cardElevation(defaultElevation = 6.dp)
 			) {
@@ -485,12 +488,12 @@ fun SelectScreen(
 					Icon(
 						Icons.Outlined.QrCodeScanner,
 						contentDescription = null,
-						tint = Color.White
+						tint = scanFg
 					)
 					Spacer(Modifier.width(10.dp))
 					Text(
 						text = lastScan ?: "",
-						color = Color.White,
+						color = scanFg,
 						style = MaterialTheme.typography.bodyMedium,
 						fontWeight = FontWeight.SemiBold
 					)
