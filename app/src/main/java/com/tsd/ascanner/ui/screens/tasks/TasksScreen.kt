@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -83,6 +84,7 @@ import com.tsd.ascanner.utils.DebugSession
 import com.tsd.ascanner.ui.components.ServerActionButtons
 import com.tsd.ascanner.ui.components.SearchScanMode
 import com.tsd.ascanner.ui.components.ServerSearchField
+import com.tsd.ascanner.ui.components.LeftOverlayLazyScrollbar
 import com.tsd.ascanner.ui.theme.statusCardColor
 import com.tsd.ascanner.ui.theme.parseHexColorOrNull
 
@@ -113,6 +115,7 @@ fun TasksScreen(
     var loadingOrderId by remember { mutableStateOf<String?>(null) }
 	var searchFocused by remember { mutableStateOf(false) }
     var showCamera by remember { mutableStateOf(false) }
+    val listState = rememberLazyListState()
 	var bottomActionsHeightPx by remember { mutableStateOf(0) }
 	val density = LocalDensity.current
 
@@ -329,8 +332,43 @@ fun TasksScreen(
 			update = { v -> v.post { if (!searchFocused) v.requestFocus() } }
         )
 
+		// Filter tasks/orders by open/closed and search query
+		val q = if (vm.isSearchAvailable) vm.searchQuery.trim().lowercase() else ""
+		val filteredTasks = vm.tasks.mapNotNull { t ->
+			val baseOrders = if (!vm.showOnlyOpen) t.orders else t.orders.filter { (it.status ?: "").lowercase() != "closed" }
+			if (q.isEmpty()) {
+				if (baseOrders.isNotEmpty()) t.copy(orders = baseOrders) else null
+			} else {
+				val taskMatch = t.name.contains(q, ignoreCase = true) || t.id.contains(q, ignoreCase = true)
+				val ordersMatched = baseOrders.filter { o ->
+					o.name.contains(q, ignoreCase = true) ||
+					(o.comment1?.contains(q, ignoreCase = true) == true) ||
+					(o.comment2?.contains(q, ignoreCase = true) == true) ||
+					((o.status ?: "").contains(q, ignoreCase = true)) ||
+					o.id.contains(q, ignoreCase = true)
+				}
+				val finalOrders = if (taskMatch) baseOrders else ordersMatched
+				if (taskMatch || finalOrders.isNotEmpty()) t.copy(orders = finalOrders) else null
+			}
+		}
+
+		val taskColors = filteredTasks.map { t ->
+			val orig = vm.tasks.firstOrNull { it.id == t.id }
+			val sts = orig?.orders?.map { (it.status ?: "").lowercase() } ?: emptyList()
+			val cnt = orig?.orders?.size ?: 0
+			when {
+				sts.any { it == "error" } -> colors.statusErrorBg
+				sts.any { it == "warning" } -> colors.statusWarningBg
+				cnt > 0 && sts.all { it == "closed" } -> colors.statusDoneBg
+				sts.any { it == "pending" } -> colors.statusPendingBg
+				sts.any { it == "note" } -> colors.statusNoteBg
+				else -> colors.statusTodoBg
+			}
+		}
+
         LazyColumn(
 			modifier = Modifier.fillMaxSize(),
+			state = listState,
 			contentPadding = PaddingValues(bottom = bottomPaddingDp)
 		) {
             // Header: filter and errors
@@ -384,26 +422,6 @@ fun TasksScreen(
 					}
                 }
             }
-
-			// Filter tasks/orders by open/closed and search query
-			val q = if (vm.isSearchAvailable) vm.searchQuery.trim().lowercase() else ""
-			val filteredTasks = vm.tasks.mapNotNull { t ->
-				val baseOrders = if (!vm.showOnlyOpen) t.orders else t.orders.filter { (it.status ?: "").lowercase() != "closed" }
-				if (q.isEmpty()) {
-					if (baseOrders.isNotEmpty()) t.copy(orders = baseOrders) else null
-				} else {
-					val taskMatch = t.name.contains(q, ignoreCase = true) || t.id.contains(q, ignoreCase = true)
-					val ordersMatched = baseOrders.filter { o ->
-						o.name.contains(q, ignoreCase = true) ||
-						(o.comment1?.contains(q, ignoreCase = true) == true) ||
-						(o.comment2?.contains(q, ignoreCase = true) == true) ||
-						((o.status ?: "").contains(q, ignoreCase = true)) ||
-						o.id.contains(q, ignoreCase = true)
-					}
-					val finalOrders = if (taskMatch) baseOrders else ordersMatched
-					if (taskMatch || finalOrders.isNotEmpty()) t.copy(orders = finalOrders) else null
-				}
-			}
 
             items(filteredTasks) { t ->
                 val original = vm.tasks.firstOrNull { it.id == t.id }
@@ -621,6 +639,12 @@ fun TasksScreen(
                 onClose = { showCamera = false }
             )
         }
+
+        LeftOverlayLazyScrollbar(
+            listState = listState,
+            modifier = Modifier.align(Alignment.CenterStart),
+            itemColors = taskColors
+        )
     }
 
     val activity = context as? ComponentActivity

@@ -83,6 +83,7 @@ import com.tsd.ascanner.utils.DebugSession
 import com.tsd.ascanner.ui.components.ServerActionButtons
 import com.tsd.ascanner.ui.components.SearchScanMode
 import com.tsd.ascanner.ui.components.ServerSearchField
+import com.tsd.ascanner.ui.components.LeftOverlayLazyScrollbar
 import com.tsd.ascanner.ui.theme.statusCardColor
 import com.tsd.ascanner.ui.theme.parseHexColorOrNull
 import androidx.compose.ui.layout.onGloballyPositioned
@@ -298,6 +299,29 @@ fun PosScreen(
 		}
 		val bottomPaddingDp = with(density) { bottomActionsHeightPx.toDp() } + 8.dp
 
+		val posItemsList = pos?.items.orEmpty()
+		val posQ = if (isSearchAvailable) searchQuery.trim() else ""
+		val filteredItems = if (posQ.isBlank()) {
+			posItemsList
+		} else {
+			posItemsList.filter { it2 ->
+				it2.name.contains(posQ, ignoreCase = true) ||
+					it2.id.contains(posQ, ignoreCase = true) ||
+					(it2.text?.contains(posQ, ignoreCase = true) == true) ||
+					(it2.statusText?.contains(posQ, ignoreCase = true) == true) ||
+					((it2.status ?: "").contains(posQ, ignoreCase = true))
+			}
+		}
+		val posItemColors = filteredItems.map { item ->
+			statusCardColor(
+				colors = colors,
+				status = item.status,
+				statusColor = item.statusColor,
+				fallbackStatus = pos?.status,
+				fallbackStatusColor = pos?.statusColor
+			)
+		}
+
         LazyColumn(
 			modifier = Modifier.fillMaxSize(),
 			state = listState,
@@ -380,19 +404,6 @@ fun PosScreen(
                 }
             }
 
-			val itemsList = pos?.items.orEmpty()
-			val q = if (isSearchAvailable) searchQuery.trim() else ""
-			val filteredItems = if (q.isBlank()) {
-				itemsList
-			} else {
-				itemsList.filter { it2 ->
-					it2.name.contains(q, ignoreCase = true) ||
-						it2.id.contains(q, ignoreCase = true) ||
-						(it2.text?.contains(q, ignoreCase = true) == true) ||
-						(it2.statusText?.contains(q, ignoreCase = true) == true) ||
-						((it2.status ?: "").contains(q, ignoreCase = true))
-				}
-			}
             val textColor = colors.textPrimary
             val subColor = colors.textSecondary
 
@@ -583,6 +594,12 @@ fun PosScreen(
             )
         }
 		// (floating actions removed; actions are under heading now)
+
+        LeftOverlayLazyScrollbar(
+            listState = listState,
+            modifier = Modifier.align(Alignment.CenterStart),
+            itemColors = posItemColors
+        )
 
         // Progress overlay during deletion or refresh
         if (isRequesting.value || posLoading.value) {

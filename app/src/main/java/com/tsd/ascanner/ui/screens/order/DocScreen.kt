@@ -79,6 +79,7 @@ import com.tsd.ascanner.utils.DebugSession
 import com.tsd.ascanner.ui.components.ServerActionButtons
 import com.tsd.ascanner.ui.components.SearchScanMode
 import com.tsd.ascanner.ui.components.ServerSearchField
+import com.tsd.ascanner.ui.components.LeftOverlayLazyScrollbar
 import com.tsd.ascanner.ui.theme.statusCardColor
 import com.tsd.ascanner.ui.theme.parseHexColorOrNull
 import androidx.compose.ui.layout.onGloballyPositioned
@@ -307,6 +308,28 @@ fun DocScreen(
 		}
 		val bottomPaddingDp = with(density) { bottomActionsHeightPx.toDp() } + 8.dp
 
+		val docItemsList = doc?.items.orEmpty()
+		val docQ = if (isSearchAvailable) searchQuery.trim() else ""
+		val filteredItems = if (docQ.isBlank()) {
+			docItemsList
+		} else {
+			docItemsList.filter { it2 ->
+				it2.name.contains(docQ, ignoreCase = true) ||
+					it2.id.contains(docQ, ignoreCase = true) ||
+					(it2.statusText?.contains(docQ, ignoreCase = true) == true) ||
+					((it2.status ?: "").contains(docQ, ignoreCase = true))
+			}
+		}
+		val docItemColors = filteredItems.map { item ->
+			statusCardColor(
+				colors = colors,
+				status = item.status,
+				statusColor = item.statusColor,
+				fallbackStatus = doc?.status,
+				fallbackStatusColor = doc?.statusColor
+			)
+		}
+
         LazyColumn(
 			modifier = Modifier.fillMaxSize(),
 			state = listState,
@@ -366,18 +389,6 @@ fun DocScreen(
                 }
             }
 
-            val itemsList = doc?.items.orEmpty()
-			val q = if (isSearchAvailable) searchQuery.trim() else ""
-			val filteredItems = if (q.isBlank()) {
-				itemsList
-			} else {
-				itemsList.filter { it2 ->
-					it2.name.contains(q, ignoreCase = true) ||
-						it2.id.contains(q, ignoreCase = true) ||
-						(it2.statusText?.contains(q, ignoreCase = true) == true) ||
-						((it2.status ?: "").contains(q, ignoreCase = true))
-				}
-			}
 			items(filteredItems) { it ->
 				val bg = statusCardColor(
 					colors = colors,
@@ -654,6 +665,12 @@ fun DocScreen(
                 onClose = { showCamera = false }
             )
         }
+
+        LeftOverlayLazyScrollbar(
+            listState = listState,
+            modifier = Modifier.align(Alignment.CenterStart),
+            itemColors = docItemColors
+        )
 
         if (globalLoading.value || loadingPosId != null) {
             Box(modifier = Modifier.fillMaxSize()) {
