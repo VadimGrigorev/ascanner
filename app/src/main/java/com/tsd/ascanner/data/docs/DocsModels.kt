@@ -72,6 +72,7 @@ data class DocItemDto(
     @SerializedName("Name") val name: String,
     @SerializedName("Id") val id: String,
     @SerializedName("StatusText") val statusText: String? = null,
+    @SerializedName("StatusTextButton") val statusTextButton: String? = null,
     @SerializedName("Status") val status: String? = null,
 	@SerializedName(value = "StatusColor", alternate = ["statusColor"]) val statusColor: String? = null
 )
@@ -117,6 +118,7 @@ data class PosItemDto(
     @SerializedName("Id") val id: String,
     @SerializedName("Text") val text: String? = null,
     @SerializedName("StatusText") val statusText: String? = null,
+    @SerializedName("StatusTextButton") val statusTextButton: String? = null,
     @SerializedName("Status") val status: String? = null,
 	@SerializedName(value = "StatusColor", alternate = ["statusColor"]) val statusColor: String? = null
 )

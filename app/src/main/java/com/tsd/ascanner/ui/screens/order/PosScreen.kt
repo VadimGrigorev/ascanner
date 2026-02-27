@@ -13,11 +13,14 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.border
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.IconButton
@@ -33,6 +36,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.tsd.ascanner.AScannerApp
 import com.tsd.ascanner.ui.theme.AppTheme
 import androidx.compose.ui.Alignment
@@ -70,6 +74,7 @@ import androidx.compose.material.icons.outlined.QrCodeScanner
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
@@ -431,6 +436,47 @@ fun PosScreen(
                                     contentDescription = "Удалить код",
                                     tint = colors.textPrimary
                                 )
+                            }
+                        }
+                        val stb = it.statusTextButton
+                        val st = it.statusText
+                        if (!st.isNullOrBlank() || !stb.isNullOrBlank()) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(top = 4.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                if (!st.isNullOrBlank()) {
+                                    Text(
+                                        text = st,
+                                        color = subColor,
+                                        modifier = Modifier.weight(5f)
+                                    )
+                                } else {
+                                    Spacer(Modifier.weight(5f))
+                                }
+                                if (!stb.isNullOrBlank()) {
+                                    Box(
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .fillMaxHeight()
+                                            .heightIn(min = 48.dp)
+                                            .clickable { /* TODO: StatusTextButton action */ }
+                                            .padding(vertical = 8.dp),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text(
+                                            text = stb,
+                                            color = textColor,
+                                            style = MaterialTheme.typography.titleLarge.copy(
+                                                fontSize = (MaterialTheme.typography.titleLarge.fontSize.value + 2).sp
+                                            ),
+                                            fontWeight = FontWeight.Light,
+                                            textAlign = TextAlign.Center
+                                        )
+                                    }
+                                }
                             }
                         }
                     }
