@@ -73,6 +73,7 @@ data class DocItemDto(
     @SerializedName("Id") val id: String,
     @SerializedName("StatusText") val statusText: String? = null,
     @SerializedName("StatusTextButton") val statusTextButton: String? = null,
+    @SerializedName("StatusTextButtonId") val statusTextButtonId: String? = null,
     @SerializedName("Status") val status: String? = null,
 	@SerializedName(value = "StatusColor", alternate = ["statusColor"]) val statusColor: String? = null
 )
@@ -98,6 +99,14 @@ data class PosRequest(
     @SerializedName("Request") val request: String = "refresh"
 )
 
+data class PosButtonRequest(
+    @SerializedName("Bearer") val bearer: String,
+    @SerializedName("Form") val form: String = "pos",
+    @SerializedName("FormId") val formId: String,
+    @SerializedName("Request") val request: String = "refresh",
+    @SerializedName("StatusTextButtonId") val statusTextButtonId: String
+)
+
 data class PosResponse(
     @SerializedName("MessageType") val messageType: String? = null, // "refresh"
     @SerializedName("Form") val form: String? = null,               // "pos"
@@ -119,6 +128,7 @@ data class PosItemDto(
     @SerializedName("Text") val text: String? = null,
     @SerializedName("StatusText") val statusText: String? = null,
     @SerializedName("StatusTextButton") val statusTextButton: String? = null,
+    @SerializedName("StatusTextButtonId") val statusTextButtonId: String? = null,
     @SerializedName("Status") val status: String? = null,
 	@SerializedName(value = "StatusColor", alternate = ["statusColor"]) val statusColor: String? = null
 )

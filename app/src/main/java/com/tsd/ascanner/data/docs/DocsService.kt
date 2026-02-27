@@ -280,6 +280,23 @@ class DocsService(
 		}
     }
 
+    suspend fun fetchPosButton(formId: String, statusTextButtonId: String, logRequest: Boolean = true, emitNav: Boolean = true): PosResponse {
+        val bearer = authService.bearer ?: throw IllegalStateException("Нет токена авторизации")
+        val req = PosButtonRequest(bearer = bearer, formId = formId, statusTextButtonId = statusTextButtonId)
+		val element = apiClient.postForJsonElement("/pos", req, logRequest = logRequest)
+		val obj = element.asJsonObject
+		val messageType = if (obj.has("MessageType")) obj.get("MessageType").asString else null
+		if (messageType != null && messageType.equals("dialog", ignoreCase = true)) {
+			throw ServerDialogShownException()
+		}
+		routeByForm(obj, fallbackForm = "pos", emitNav = emitNav)
+		return if (obj.has("Form") && obj.get("Form").asString.equals("pos", ignoreCase = true)) {
+			Gson().fromJson(obj, PosResponse::class.java)
+		} else {
+			PosResponse(formId = formId)
+		}
+    }
+
     suspend fun scanPosMark(formId: String, text: String): ScanPosResult {
         val bearer = authService.bearer ?: throw IllegalStateException("Нет токена авторизации")
         val req = DocScan2Request(bearer = bearer, form = "pos", formId = formId, text = text)

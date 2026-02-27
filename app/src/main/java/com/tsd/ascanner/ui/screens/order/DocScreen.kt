@@ -57,6 +57,7 @@ import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.waitForUpOrCancellation
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.layout.height
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.input.pointer.PointerEventPass
@@ -107,6 +108,7 @@ fun DocScreen(
     val globalLoading = remember { mutableStateOf(false) }
     val isRequesting = remember { mutableStateOf(false) }
     var loadingPosId by remember { mutableStateOf<String?>(null) }
+    var loadingButtonItemId by remember { mutableStateOf<String?>(null) }
     var showCamera by remember { mutableStateOf(false) }
     val listState = rememberLazyListState()
 	var bottomActionsHeightPx by remember { mutableStateOf(0) }
@@ -445,19 +447,39 @@ fun DocScreen(
                                     Text(
                                         text = st,
                                         color = subColor,
-                                        modifier = Modifier.weight(5f)
+                                        modifier = Modifier.weight(3f)
                                     )
                                 } else {
-                                    Spacer(Modifier.weight(5f))
+                                    Spacer(Modifier.weight(3f))
                                 }
                                 if (!stb.isNullOrBlank()) {
+                                    val btnShape = RoundedCornerShape(8.dp)
+                                    val btnBg = if (loadingButtonItemId == it.id) Color(0xFFFFF44F) else Color.Transparent
                                     Box(
                                         modifier = Modifier
                                             .weight(1f)
                                             .fillMaxHeight()
                                             .heightIn(min = 48.dp)
-                                            .clickable { /* TODO: StatusTextButton action */ }
-                                            .padding(vertical = 8.dp),
+                                            .border(1.dp, colors.textSecondary, btnShape)
+                                            .background(btnBg, btnShape)
+                                            .clip(btnShape)
+                                            .clickable {
+                                                val btnFormId = it.id
+                                                val btnId = it.statusTextButtonId ?: ""
+                                                scope.launch {
+                                                    try {
+                                                        loadingButtonItemId = btnFormId
+                                                        errorMessage.value = null
+                                                        docsService.fetchPosButton(btnFormId, btnId)
+                                                    } catch (e: Exception) {
+                                                        if (e !is ServerDialogShownException) {
+                                                            errorMessage.value = e.message ?: "Ошибка загрузки позиции"
+                                                        }
+                                                    } finally {
+                                                        loadingButtonItemId = null
+                                                    }
+                                                }
+                                            },
                                         contentAlignment = Alignment.Center
                                     ) {
                                         Text(
