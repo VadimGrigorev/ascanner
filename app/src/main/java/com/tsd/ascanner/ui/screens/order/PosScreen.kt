@@ -354,7 +354,7 @@ fun PosScreen(
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(top = 8.dp),
-                        horizontalArrangement = Arrangement.End,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Button(
@@ -375,6 +375,7 @@ fun PosScreen(
                                 }
                             }
                         },
+                            modifier = Modifier.weight(1f),
                             colors = ButtonDefaults.buttonColors(
                                 containerColor = colors.secondary,
                                 contentColor = colors.textPrimary
@@ -384,11 +385,10 @@ fun PosScreen(
                                 imageVector = Icons.Outlined.Refresh,
                                 contentDescription = "Обновить"
                             )
-                            Text(text = "Обновить", modifier = Modifier.padding(start = 8.dp))
                         }
-                        Spacer(modifier = Modifier.width(12.dp))
                         Button(
                             onClick = { showDeleteAll.value = true },
+                            modifier = Modifier.weight(1f),
                             colors = ButtonDefaults.buttonColors(
                                 containerColor = colors.secondary,
                                 contentColor = colors.textPrimary
@@ -398,7 +398,6 @@ fun PosScreen(
                                 imageVector = Icons.Outlined.Delete,
                                 contentDescription = "Удалить все"
                             )
-                            Text(text = "Удалить", modifier = Modifier.padding(start = 8.dp))
                         }
                     }
                 }
