@@ -20,6 +20,8 @@ import com.tsd.ascanner.utils.PrintBus
 import com.tsd.ascanner.utils.SelectBus
 import com.tsd.ascanner.utils.ServerDialog
 import com.tsd.ascanner.utils.ServerDialogButton
+import com.tsd.ascanner.utils.ServerDialogNum
+import com.tsd.ascanner.utils.DialogNumBus
 import com.tsd.ascanner.utils.ServerDialogShownException
 import com.tsd.ascanner.utils.ServerPrintRequest
 import com.tsd.ascanner.utils.ServerSelect
@@ -188,6 +190,34 @@ class ApiClient(
 							statusColor = statusColor,
 							backgroundColor = backgroundColor,
 							buttons = buttons
+						)
+					)
+					if (throwOnDialog) throw ServerDialogShownException()
+					return
+				}
+				// Handle numeric input dialog from server (MessageType="dialognum")
+				if (mt != null && mt.equals("dialognum", ignoreCase = true)) {
+					val formId = if (obj.has("FormId")) obj.get("FormId").asString else ""
+					val header = if (obj.has("DialogHeader")) obj.get("DialogHeader").asString else ""
+					val text = if (obj.has("DialogText")) obj.get("DialogText").asString else ""
+					val status = if (obj.has("Status")) obj.get("Status").asString else ""
+					val numberLength = if (obj.has("NumberLength")) {
+						obj.get("NumberLength").asString.toIntOrNull() ?: 15
+					} else 15
+					val numberScale = if (obj.has("NumberScale")) {
+						obj.get("NumberScale").asString.toIntOrNull() ?: 3
+					} else 3
+					val numberId = if (obj.has("NumberId")) obj.get("NumberId").asString else ""
+					DialogNumBus.emit(
+						ServerDialogNum(
+							form = form ?: "",
+							formId = formId,
+							header = header,
+							text = text,
+							status = status,
+							numberLength = numberLength,
+							numberScale = numberScale,
+							numberId = numberId
 						)
 					)
 					if (throwOnDialog) throw ServerDialogShownException()

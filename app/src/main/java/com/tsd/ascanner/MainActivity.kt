@@ -74,6 +74,12 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.text.input.KeyboardType
+import com.tsd.ascanner.utils.DialogNumBus
+import com.tsd.ascanner.utils.ServerDialogNum
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -94,6 +100,9 @@ class MainActivity : ComponentActivity() {
 				var currentPrintRequest by remember { mutableStateOf<ServerPrintRequest?>(null) }
 				var showPrinterDialog by remember { mutableStateOf(false) }
 				var globalSelect by remember { mutableStateOf<ServerSelect?>(null) }
+				var globalDialogNum by remember { mutableStateOf<ServerDialogNum?>(null) }
+				var dialogNumSending by remember { mutableStateOf(false) }
+				var dialogNumValue by remember { mutableStateOf("") }
 				val scope = rememberCoroutineScope()
                 LaunchedEffect(Unit) {
                     ErrorBus.events.collectLatest { msg ->
@@ -137,6 +146,14 @@ class MainActivity : ComponentActivity() {
 								launchSingleTop = true
 							}
 						}
+					}
+				}
+				// Handle numeric input dialogs from server (MessageType="dialognum")
+				LaunchedEffect(Unit) {
+					DialogNumBus.events.collectLatest { dlgNum ->
+						globalDialogNum = dlgNum
+						dialogNumSending = false
+						dialogNumValue = ""
 					}
 				}
 				LaunchedEffect(Unit) {
@@ -380,6 +397,136 @@ class MainActivity : ComponentActivity() {
 
 							// Center-screen spinner while dialog button request is in-flight
 							if (dialogSending) {
+								Box(modifier = Modifier.fillMaxSize()) {
+									CircularProgressIndicator(
+										modifier = Modifier.align(Alignment.Center),
+										color = Color(0xFF30323D)
+									)
+								}
+							}
+						}
+
+						// Global numeric input dialog (MessageType="dialognum")
+						val dlgNum = globalDialogNum
+						if (dlgNum != null) {
+							val numBg = statusCardColor(
+								colors = appColors,
+								status = dlgNum.status,
+								statusColor = null
+							)
+							val numFg = if (numBg.luminance() < 0.45f) Color.White else Color.Black
+							AlertDialog(
+								onDismissRequest = { /* non-dismissible */ },
+								properties = DialogProperties(
+									dismissOnBackPress = false,
+									dismissOnClickOutside = false
+								),
+								containerColor = numBg,
+								title = {
+									Text(text = dlgNum.header.ifBlank { "Ввод количества" }, color = numFg)
+								},
+								text = {
+									Column {
+										if (dlgNum.text.isNotBlank()) {
+											Text(text = dlgNum.text, color = numFg)
+											Spacer(Modifier.padding(top = 8.dp))
+										}
+										OutlinedTextField(
+											value = dialogNumValue,
+											onValueChange = { newVal ->
+												val filtered = newVal.replace(',', '.')
+												val maxIntDigits = dlgNum.numberLength - dlgNum.numberScale
+												val dotIndex = filtered.indexOf('.')
+												if (dotIndex < 0) {
+													if (filtered.length <= maxIntDigits && filtered.all { c -> c.isDigit() }) {
+														dialogNumValue = filtered
+													}
+												} else {
+													val intPart = filtered.substring(0, dotIndex)
+													val fracPart = filtered.substring(dotIndex + 1)
+													if (intPart.length <= maxIntDigits &&
+														fracPart.length <= dlgNum.numberScale &&
+														intPart.all { c -> c.isDigit() } &&
+														fracPart.all { c -> c.isDigit() } &&
+														filtered.count { c -> c == '.' } == 1
+													) {
+														dialogNumValue = filtered
+													}
+												}
+											},
+											keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+											singleLine = true,
+											colors = OutlinedTextFieldDefaults.colors(
+												focusedTextColor = numFg,
+												unfocusedTextColor = numFg,
+												cursorColor = numFg,
+												focusedBorderColor = numFg.copy(alpha = 0.7f),
+												unfocusedBorderColor = numFg.copy(alpha = 0.4f)
+											),
+											modifier = Modifier.fillMaxWidth()
+										)
+									}
+								},
+								confirmButton = {
+									Row(
+										horizontalArrangement = Arrangement.spacedBy(8.dp),
+										verticalAlignment = Alignment.CenterVertically
+									) {
+										TextButton(
+											onClick = {
+												globalDialogNum = null
+												dialogNumValue = ""
+												dialogNumSending = false
+											}
+										) {
+											Text(text = "Отмена", color = numFg)
+										}
+										TextButton(
+											enabled = !dialogNumSending && dialogNumValue.isNotBlank(),
+											onClick = {
+												val clickedDlg = dlgNum
+												dialogNumSending = true
+												scope.launch {
+													try {
+														when (val res = app.docsService.sendDialogNum(
+															form = dlgNum.form,
+															formId = dlgNum.formId,
+															numberId = dlgNum.numberId,
+															number = dialogNumValue
+														)) {
+															is com.tsd.ascanner.data.docs.ButtonResult.Success -> {
+																if (globalDialogNum === clickedDlg) {
+																	globalDialogNum = null
+																	dialogNumValue = ""
+																}
+															}
+															is com.tsd.ascanner.data.docs.ButtonResult.DialogShown -> {
+																if (globalDialogNum === clickedDlg) {
+																	globalDialogNum = null
+																	dialogNumValue = ""
+																}
+															}
+															is com.tsd.ascanner.data.docs.ButtonResult.Error -> {
+																if (globalDialogNum === clickedDlg) {
+																	globalDialogNum = null
+																	dialogNumValue = ""
+																}
+																ErrorBus.emit(res.message)
+															}
+														}
+													} finally {
+														dialogNumSending = false
+													}
+												}
+											}
+										) {
+											Text(text = "OK", color = numFg)
+										}
+									}
+								}
+							)
+
+							if (dialogNumSending) {
 								Box(modifier = Modifier.fillMaxSize()) {
 									CircularProgressIndicator(
 										modifier = Modifier.align(Alignment.Center),

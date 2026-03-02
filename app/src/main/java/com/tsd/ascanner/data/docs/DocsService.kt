@@ -84,6 +84,10 @@ class DocsService(
 		if (messageType != null && messageType.equals("select", ignoreCase = true)) {
 			return
 		}
+		// Numeric input dialog is handled globally (DialogNumBus + MainActivity), not a form update.
+		if (messageType != null && messageType.equals("dialognum", ignoreCase = true)) {
+			return
+		}
 
 		val respForm = when {
 			obj.has("Form") -> obj.get("Form").asString
@@ -159,8 +163,7 @@ class DocsService(
 		val element = apiClient.postForJsonElement("/doc", req, logRequest = logRequest)
 		val obj = element.asJsonObject
 		val messageType = if (obj.has("MessageType")) obj.get("MessageType").asString else null
-		if (messageType != null && messageType.equals("dialog", ignoreCase = true)) {
-			// Dialog will be shown via global DialogBus
+		if (messageType != null && (messageType.equals("dialog", ignoreCase = true) || messageType.equals("dialognum", ignoreCase = true))) {
 			throw ServerDialogShownException()
 		}
 		routeByForm(obj, fallbackForm = "doc", emitNav = emitNav)
@@ -201,7 +204,7 @@ class DocsService(
         val element = apiClient.postForJsonElement("/scanlist", req, logRequest = true)
         val obj = element.asJsonObject
         val messageType = if (obj.has("MessageType")) obj.get("MessageType").asString else null
-		if (messageType != null && messageType.equals("dialog", ignoreCase = true)) {
+		if (messageType != null && (messageType.equals("dialog", ignoreCase = true) || messageType.equals("dialognum", ignoreCase = true))) {
 			return ScanDocResult.DialogShown
 		}
 		// Print is a side-effect handled globally (PrintBus + PrinterDialog). It is not a document payload.
@@ -243,8 +246,8 @@ class DocsService(
         val req = DocScan2Request(bearer = bearer, formId = formId, text = text)
         val element = apiClient.postForJsonElement("/scan", req, logRequest = true)
         val obj = element.asJsonObject
-        val messageType = if (obj.has("MessageType")) obj.get("MessageType").asString else null
-		if (messageType != null && messageType.equals("dialog", ignoreCase = true)) {
+	    val messageType = if (obj.has("MessageType")) obj.get("MessageType").asString else null
+		if (messageType != null && (messageType.equals("dialog", ignoreCase = true) || messageType.equals("dialognum", ignoreCase = true))) {
 			return ScanDocResult.DialogShown
 		}
         if (messageType != null && messageType.equals("error", ignoreCase = true)) {
@@ -267,8 +270,7 @@ class DocsService(
 		val element = apiClient.postForJsonElement("/pos", req, logRequest = logRequest)
 		val obj = element.asJsonObject
 		val messageType = if (obj.has("MessageType")) obj.get("MessageType").asString else null
-		if (messageType != null && messageType.equals("dialog", ignoreCase = true)) {
-			// Dialog will be shown via global DialogBus
+		if (messageType != null && (messageType.equals("dialog", ignoreCase = true) || messageType.equals("dialognum", ignoreCase = true))) {
 			throw ServerDialogShownException()
 		}
 		routeByForm(obj, fallbackForm = "pos", emitNav = emitNav)
@@ -286,7 +288,7 @@ class DocsService(
 		val element = apiClient.postForJsonElement("/pos", req, logRequest = logRequest)
 		val obj = element.asJsonObject
 		val messageType = if (obj.has("MessageType")) obj.get("MessageType").asString else null
-		if (messageType != null && messageType.equals("dialog", ignoreCase = true)) {
+		if (messageType != null && (messageType.equals("dialog", ignoreCase = true) || messageType.equals("dialognum", ignoreCase = true))) {
 			throw ServerDialogShownException()
 		}
 		routeByForm(obj, fallbackForm = "pos", emitNav = emitNav)
@@ -303,7 +305,7 @@ class DocsService(
         val element = apiClient.postForJsonElement("/scanone", req, logRequest = true)
         val obj = element.asJsonObject
         val messageType = if (obj.has("MessageType")) obj.get("MessageType").asString else null
-		if (messageType != null && messageType.equals("dialog", ignoreCase = true)) {
+		if (messageType != null && (messageType.equals("dialog", ignoreCase = true) || messageType.equals("dialognum", ignoreCase = true))) {
 			return ScanPosResult.DialogShown
 		}
         if (messageType != null && messageType.equals("error", ignoreCase = true)) {
@@ -325,7 +327,7 @@ class DocsService(
         val element = apiClient.postForJsonElement("/posdelete", req, logRequest = true)
         val obj = element.asJsonObject
         val messageType = if (obj.has("MessageType")) obj.get("MessageType").asString else null
-		if (messageType != null && messageType.equals("dialog", ignoreCase = true)) {
+		if (messageType != null && (messageType.equals("dialog", ignoreCase = true) || messageType.equals("dialognum", ignoreCase = true))) {
 			return ScanPosResult.DialogShown
 		}
         if (messageType != null && messageType.equals("error", ignoreCase = true)) {
@@ -347,7 +349,7 @@ class DocsService(
         val element = apiClient.postForJsonElement("/posdelete", req, logRequest = true)
         val obj = element.asJsonObject
         val messageType = if (obj.has("MessageType")) obj.get("MessageType").asString else null
-		if (messageType != null && messageType.equals("dialog", ignoreCase = true)) {
+		if (messageType != null && (messageType.equals("dialog", ignoreCase = true) || messageType.equals("dialognum", ignoreCase = true))) {
 			return ScanPosResult.DialogShown
 		}
         if (messageType != null && messageType.equals("error", ignoreCase = true)) {
@@ -371,7 +373,7 @@ class DocsService(
 			if (!element.isJsonObject) return ButtonResult.Success
 			val obj = element.asJsonObject
 			val messageType = if (obj.has("MessageType")) obj.get("MessageType").asString else null
-			if (messageType != null && messageType.equals("dialog", ignoreCase = true)) {
+			if (messageType != null && (messageType.equals("dialog", ignoreCase = true) || messageType.equals("dialognum", ignoreCase = true))) {
 				return ButtonResult.DialogShown
 			}
 			if (messageType != null && messageType.equals("error", ignoreCase = true)) {
@@ -393,7 +395,29 @@ class DocsService(
 			if (!element.isJsonObject) return ButtonResult.Success
 			val obj = element.asJsonObject
 			val messageType = if (obj.has("MessageType")) obj.get("MessageType").asString else null
-			if (messageType != null && messageType.equals("dialog", ignoreCase = true)) {
+			if (messageType != null && (messageType.equals("dialog", ignoreCase = true) || messageType.equals("dialognum", ignoreCase = true))) {
+				return ButtonResult.DialogShown
+			}
+			if (messageType != null && messageType.equals("error", ignoreCase = true)) {
+				val msg = if (obj.has("Message")) obj.get("Message").asString else "Ошибка"
+				return ButtonResult.Error(msg)
+			}
+			routeByForm(obj, fallbackForm = form)
+			ButtonResult.Success
+		} catch (e: Exception) {
+			ButtonResult.Error(e.message ?: "Ошибка запроса")
+		}
+	}
+
+	suspend fun sendDialogNum(form: String, formId: String, numberId: String, number: String): ButtonResult {
+		val bearer = authService.bearer ?: return ButtonResult.Error("Нет токена авторизации")
+		val req = DialogNumRequest(bearer = bearer, form = form, formId = formId, selectedId = numberId, number = number)
+		return try {
+			val element = apiClient.postForJsonElement("/button", req, logRequest = true)
+			if (!element.isJsonObject) return ButtonResult.Success
+			val obj = element.asJsonObject
+			val messageType = if (obj.has("MessageType")) obj.get("MessageType").asString else null
+			if (messageType != null && (messageType.equals("dialog", ignoreCase = true) || messageType.equals("dialognum", ignoreCase = true))) {
 				return ButtonResult.DialogShown
 			}
 			if (messageType != null && messageType.equals("error", ignoreCase = true)) {
@@ -421,9 +445,10 @@ class DocsService(
 			if (!element.isJsonObject) return ButtonResult.Success
 			val obj = element.asJsonObject
 			val messageType = if (obj.has("MessageType")) obj.get("MessageType").asString else null
-			// Dialog/print/select are handled globally (DialogBus/Print/SelectBus)
+			// Dialog/dialognum/print/select are handled globally (DialogBus/DialogNumBus/Print/SelectBus)
 			if (messageType != null && (
 					messageType.equals("dialog", ignoreCase = true) ||
+						messageType.equals("dialognum", ignoreCase = true) ||
 						messageType.equals("print", ignoreCase = true) ||
 						messageType.equals("select", ignoreCase = true)
 				)
