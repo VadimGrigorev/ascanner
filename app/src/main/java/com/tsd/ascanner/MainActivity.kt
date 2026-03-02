@@ -398,8 +398,18 @@ class MainActivity : ComponentActivity() {
 								currentPrintRequest = null
 							},
 							onPrintSuccess = {
+								val req = currentPrintRequest
 								showPrinterDialog = false
 								currentPrintRequest = null
+								if (req != null && req.selectOnExit.isNotBlank()) {
+									scope.launch {
+										app.docsService.sendSelect(
+											form = req.form,
+											formId = req.formId,
+											selectedId = req.selectOnExit
+										)
+									}
+								}
 							}
 						)
                     }

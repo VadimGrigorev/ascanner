@@ -13,5 +13,6 @@ data class ServerPrintRequest(
     val pictureType: String,  // "bmp"
     val paperWidthMm: Float,
     val paperHeightMm: Float,
-    val copies: Int
+    val copies: Int,
+    val selectOnExit: String = ""
 )

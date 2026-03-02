@@ -207,6 +207,7 @@ class ApiClient(
 					val copies = if (obj.has("PrintCopies")) {
 						obj.get("PrintCopies").asString.toIntOrNull() ?: 1
 					} else 1
+					val selectOnExit = if (obj.has("SelectOnExit")) obj.get("SelectOnExit").asString else ""
 					
 					if (picture.isNotBlank()) {
 						PrintBus.emit(
@@ -217,7 +218,8 @@ class ApiClient(
 								pictureType = pictureType,
 								paperWidthMm = paperWidth,
 								paperHeightMm = paperHeight,
-								copies = copies
+								copies = copies,
+								selectOnExit = selectOnExit
 							)
 						)
 					}
