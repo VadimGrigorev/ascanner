@@ -282,7 +282,7 @@ class DocsService(
 
     suspend fun fetchPosButton(formId: String, statusTextButtonId: String, logRequest: Boolean = true, emitNav: Boolean = true): PosResponse {
         val bearer = authService.bearer ?: throw IllegalStateException("Нет токена авторизации")
-        val req = PosButtonRequest(bearer = bearer, formId = formId, statusTextButtonId = statusTextButtonId)
+        val req = PosButtonRequest(bearer = bearer, formId = formId, selectedId = statusTextButtonId)
 		val element = apiClient.postForJsonElement("/pos", req, logRequest = logRequest)
 		val obj = element.asJsonObject
 		val messageType = if (obj.has("MessageType")) obj.get("MessageType").asString else null

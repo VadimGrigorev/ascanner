@@ -103,8 +103,8 @@ data class PosButtonRequest(
     @SerializedName("Bearer") val bearer: String,
     @SerializedName("Form") val form: String = "pos",
     @SerializedName("FormId") val formId: String,
-    @SerializedName("Request") val request: String = "refresh",
-    @SerializedName("StatusTextButtonId") val statusTextButtonId: String
+    @SerializedName("Request") val request: String = "select",
+    @SerializedName("SelectedId") val selectedId: String
 )
 
 data class PosResponse(
