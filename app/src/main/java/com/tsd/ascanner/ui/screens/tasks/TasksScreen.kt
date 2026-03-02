@@ -85,6 +85,7 @@ import com.tsd.ascanner.ui.components.ServerActionButtons
 import com.tsd.ascanner.ui.components.SearchScanMode
 import com.tsd.ascanner.ui.components.ServerSearchField
 import com.tsd.ascanner.ui.components.LeftOverlayLazyScrollbar
+import com.tsd.ascanner.data.net.ServerSettings
 import com.tsd.ascanner.ui.theme.statusCardColor
 import com.tsd.ascanner.ui.theme.parseHexColorOrNull
 
@@ -300,13 +301,15 @@ fun TasksScreen(
                         } else {
                             // On first chars, show overlay for UX
                             if (!isScanning && text.length >= 1) isScanning = true
-                            debounceJob?.cancel()
-                            debounceJob = scope.launch {
-                                kotlinx.coroutines.delay(120)
-                                val code = editText.text.toString().trim()
-                                if (code.isNotEmpty()) {
-                                    commitScan(code)
-                                    editText.setText("")
+                            if (!ServerSettings.getRingScannerMode(context)) {
+                                debounceJob?.cancel()
+                                debounceJob = scope.launch {
+                                    kotlinx.coroutines.delay(120)
+                                    val code = editText.text.toString().trim()
+                                    if (code.isNotEmpty()) {
+                                        commitScan(code)
+                                        editText.setText("")
+                                    }
                                 }
                             }
                         }

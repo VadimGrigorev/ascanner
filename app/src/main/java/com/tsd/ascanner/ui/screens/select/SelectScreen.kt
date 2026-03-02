@@ -63,6 +63,7 @@ import com.tsd.ascanner.ui.components.parseServerIconOrFallback
 import com.tsd.ascanner.ui.components.SearchScanMode
 import com.tsd.ascanner.ui.components.ServerSearchField
 import com.tsd.ascanner.ui.theme.AppTheme
+import com.tsd.ascanner.data.net.ServerSettings
 import com.tsd.ascanner.ui.theme.statusCardColor
 import com.tsd.ascanner.ui.theme.parseHexColorOrNull
 import com.tsd.ascanner.utils.DebugFlags
@@ -220,13 +221,15 @@ fun SelectScreen(
 								if (code.isNotEmpty()) handleScan(contextForm.value, contextFormId.value, code)
 								editText.setText("")
 							} else {
-								debounceJob?.cancel()
-								debounceJob = scope.launch {
-									kotlinx.coroutines.delay(120)
-									val code = editText.text.toString().trim()
-									if (code.isNotEmpty()) {
-										handleScan(contextForm.value, contextFormId.value, code)
-										editText.setText("")
+								if (!ServerSettings.getRingScannerMode(ctx)) {
+									debounceJob?.cancel()
+									debounceJob = scope.launch {
+										kotlinx.coroutines.delay(120)
+										val code = editText.text.toString().trim()
+										if (code.isNotEmpty()) {
+											handleScan(contextForm.value, contextFormId.value, code)
+											editText.setText("")
+										}
 									}
 								}
 							}

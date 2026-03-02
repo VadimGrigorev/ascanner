@@ -222,13 +222,15 @@ fun LoginScreen(
                             if (code.isNotEmpty()) commitIfReady(code)
                             editText.setText("")
                         } else {
-                            debounceJob?.cancel()
-                            debounceJob = scope.launch {
-                                kotlinx.coroutines.delay(120)
-                                val code = editText.text.toString().trim()
-                                if (code.isNotEmpty()) {
-                                    commitIfReady(code)
-                                    editText.setText("")
+                            if (!ServerSettings.getRingScannerMode(ctx)) {
+                                debounceJob?.cancel()
+                                debounceJob = scope.launch {
+                                    kotlinx.coroutines.delay(120)
+                                    val code = editText.text.toString().trim()
+                                    if (code.isNotEmpty()) {
+                                        commitIfReady(code)
+                                        editText.setText("")
+                                    }
                                 }
                             }
                         }
@@ -330,6 +332,22 @@ fun LoginScreen(
         }
 
 		Spacer(Modifier.height(12.dp))
+
+		var ringScannerMode by remember { mutableStateOf(ServerSettings.getRingScannerMode(ctx)) }
+		Row(
+			modifier = Modifier.fillMaxWidth(),
+			verticalAlignment = Alignment.CenterVertically
+		) {
+			Checkbox(
+				checked = ringScannerMode,
+				onCheckedChange = {
+					ringScannerMode = it
+					ServerSettings.setRingScannerMode(ctx, it)
+				}
+			)
+			Spacer(modifier = Modifier.width(8.dp))
+			Text(text = "Кольцо-сканер", color = colors.textSecondary)
+		}
 
 		Row(
 			modifier = Modifier.fillMaxWidth(),

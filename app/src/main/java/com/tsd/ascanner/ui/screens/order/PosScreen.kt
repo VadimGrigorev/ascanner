@@ -85,6 +85,7 @@ import com.tsd.ascanner.ui.components.ServerActionButtons
 import com.tsd.ascanner.ui.components.SearchScanMode
 import com.tsd.ascanner.ui.components.ServerSearchField
 import com.tsd.ascanner.ui.components.LeftOverlayLazyScrollbar
+import com.tsd.ascanner.data.net.ServerSettings
 import com.tsd.ascanner.ui.theme.statusCardColor
 import com.tsd.ascanner.ui.theme.parseHexColorOrNull
 import androidx.compose.ui.layout.onGloballyPositioned
@@ -581,13 +582,15 @@ fun PosScreen(
                                 editText.setText("")
                             } else {
                                 if (!isScanning.value && text.length >= 1) isScanning.value = true
-                                debounceJob?.cancel()
-                                debounceJob = scope.launch {
-                                    kotlinx.coroutines.delay(120)
-                                    val code = editText.text.toString().trim()
-                                    if (code.isNotEmpty()) {
-                                        handleScan(code)
-                                        editText.setText("")
+                                if (!ServerSettings.getRingScannerMode(ctx)) {
+                                    debounceJob?.cancel()
+                                    debounceJob = scope.launch {
+                                        kotlinx.coroutines.delay(120)
+                                        val code = editText.text.toString().trim()
+                                        if (code.isNotEmpty()) {
+                                            handleScan(code)
+                                            editText.setText("")
+                                        }
                                     }
                                 }
                             }
