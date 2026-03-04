@@ -333,20 +333,22 @@ fun LoginScreen(
 
 		Spacer(Modifier.height(12.dp))
 
-		var ringScannerMode by remember { mutableStateOf(ServerSettings.getRingScannerMode(ctx)) }
+		LaunchedEffect(Unit) {
+			if (ServerSettings.getRingScannerMode(ctx)) {
+				ServerSettings.setRingScannerMode(ctx, false)
+			}
+		}
 		Row(
 			modifier = Modifier.fillMaxWidth(),
 			verticalAlignment = Alignment.CenterVertically
 		) {
 			Checkbox(
-				checked = ringScannerMode,
-				onCheckedChange = {
-					ringScannerMode = it
-					ServerSettings.setRingScannerMode(ctx, it)
-				}
+				checked = false,
+				onCheckedChange = null,
+				enabled = false
 			)
 			Spacer(modifier = Modifier.width(8.dp))
-			Text(text = "Кольцо-сканер", color = colors.textSecondary)
+			Text(text = "Кольцо-сканер", color = colors.textSecondary.copy(alpha = 0.38f))
 		}
 
 		Row(
@@ -389,7 +391,7 @@ fun LoginScreen(
 			.padding(16.dp)
 	) {
 		Text(
-			text = "2.0 версия",
+			text = "2.1 версия",
 			modifier = Modifier.align(Alignment.BottomStart),
 			color = colors.textSecondary
 		)

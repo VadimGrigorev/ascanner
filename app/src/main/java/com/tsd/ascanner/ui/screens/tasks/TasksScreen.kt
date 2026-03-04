@@ -377,8 +377,12 @@ fun TasksScreen(
             // Header: filter and errors
             item {
                 Column(modifier = Modifier.padding(12.dp)) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Checkbox(checked = vm.showOnlyOpen, onCheckedChange = { vm.toggleShowOnlyOpen() })
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.clickable { vm.toggleShowOnlyOpen() }
+                    ) {
+                        Checkbox(checked = vm.showOnlyOpen, onCheckedChange = null)
+                        Spacer(modifier = Modifier.width(8.dp))
                         Text(text = "скрыть завершенные", color = colors.textSecondary)
                     }
 					Spacer(Modifier.height(8.dp))

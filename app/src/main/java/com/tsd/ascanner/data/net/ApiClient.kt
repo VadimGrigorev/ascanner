@@ -3,16 +3,7 @@ package com.tsd.ascanner.data.net
 import android.util.Log
 import com.google.gson.Gson
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
-import java.io.BufferedReader
-import java.io.BufferedWriter
-import java.io.InputStreamReader
-import java.io.OutputStreamWriter
-import java.lang.IllegalStateException
-import java.net.HttpURLConnection
-import java.net.URL
-import javax.net.ssl.HttpsURLConnection
 import com.tsd.ascanner.utils.ErrorBus
 import com.tsd.ascanner.utils.AppEventBus
 import com.tsd.ascanner.utils.DialogBus
@@ -27,6 +18,19 @@ import com.tsd.ascanner.utils.ServerPrintRequest
 import com.tsd.ascanner.utils.ServerSelect
 import com.tsd.ascanner.utils.ServerSelectItem
 import com.tsd.ascanner.data.docs.ActionButtonDto
+import okhttp3.Call
+import okhttp3.Connection
+import okhttp3.ConnectionPool
+import okhttp3.EventListener
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.OkHttpClient
+import okhttp3.Protocol
+import okhttp3.Request
+import okhttp3.RequestBody.Companion.toRequestBody
+import java.io.IOException
+import java.net.InetSocketAddress
+import java.net.Proxy
+import java.util.concurrent.TimeUnit
 
 class ApiClient(
     private val gson: Gson = Gson()
@@ -36,9 +40,21 @@ class ApiClient(
         .create()
 
 	companion object {
-		// Глобальный флаг: включить/выключить все HTTP-логи нашего клиента
 		private const val DEBUG_LOGS = true
 	}
+
+    private val JSON_MEDIA_TYPE = "application/json; charset=utf-8".toMediaType()
+
+    private val client: OkHttpClient = OkHttpClient.Builder()
+        .connectTimeout(5, TimeUnit.SECONDS)
+        .readTimeout(10, TimeUnit.SECONDS)
+        .writeTimeout(5, TimeUnit.SECONDS)
+        .retryOnConnectionFailure(true)
+        .connectionPool(ConnectionPool(5, 30, TimeUnit.SECONDS))
+        .apply {
+            if (DEBUG_LOGS) eventListenerFactory { DebugEventListener() }
+        }
+        .build()
 
     suspend fun <T> postAndParse(
 		path: String,
@@ -47,53 +63,39 @@ class ApiClient(
 		logRequest: Boolean = false
 	): T =
         withContext(Dispatchers.IO) {
-                val url = URL(composeUrl(path))
-                val connection = (url.openConnection() as HttpURLConnection).apply {
-                    requestMethod = "POST"
-                    doInput = true
-                    doOutput = true
-                    useCaches = false
-                    setRequestProperty("Content-Type", "application/json; charset=utf-8")
-                    setRequestProperty("Accept", "application/json")
-                    connectTimeout = 5000
-                    readTimeout = 5000
+            val url = composeUrl(path)
+            val json = gson.toJson(body)
+            if (DEBUG_LOGS && logRequest) {
+                Log.d("ApiClient", buildString {
+                    append("REQUEST POST ").append(url)
+                    if (path.isNotEmpty()) append(" (path=").append(path).append(')')
+                    append(" body=").append(formatForLog(json))
+                })
+            }
+            val request = Request.Builder()
+                .url(url)
+                .post(json.toRequestBody(JSON_MEDIA_TYPE))
+                .header("Accept", "application/json")
+                .build()
+
+            client.newCall(request).execute().use { response ->
+                val responseText = response.body?.string() ?: ""
+                val code = response.code
+                if (DEBUG_LOGS && logRequest) {
+                    Log.d("ApiClient", buildString {
+                        append("RESPONSE ").append(code).append(" from ").append(url)
+                        append(" body=").append(formatForLog(responseText))
+                    })
                 }
-                try {
-                    val json = gson.toJson(body)
-                    if (DEBUG_LOGS && logRequest) {
-                        Log.d("ApiClient", buildString {
-                            append("REQUEST POST ").append(url)
-                            if (path.isNotEmpty()) append(" (path=").append(path).append(')')
-                            append(" body=").append(formatForLog(json))
-                        })
-                    }
-                    BufferedWriter(OutputStreamWriter(connection.outputStream, Charsets.UTF_8)).use { w ->
-                        w.write(json)
-                    }
-                    val code = connection.responseCode
-                    val stream = if (code in 200..299) connection.inputStream else connection.errorStream
-                    val responseText = BufferedReader(InputStreamReader(stream, Charsets.UTF_8)).use { br ->
-                        br.readText()
-                    }
-                    if (DEBUG_LOGS && logRequest) {
-                        Log.d("ApiClient", buildString {
-                            append("RESPONSE ").append(code).append(" from ").append(url)
-                            append(" body=").append(formatForLog(responseText))
-                        })
-                    }
-                    // Global server-side error detection
-                    throwIfServerError(responseText, throwOnDialog = true)
-                    if (code !in 200..299) {
-                        throw IllegalStateException("HTTP $code: $responseText")
-                    }
-                    // Be lenient to tolerate trailing commas or minor format issues in mock responses
-                    val reader = com.google.gson.stream.JsonReader(java.io.StringReader(responseText)).apply {
-                        isLenient = true
-                    }
-                    gson.fromJson(reader, responseClass)
-                } finally {
-                    connection.disconnect()
+                throwIfServerError(responseText, throwOnDialog = true)
+                if (code !in 200..299) {
+                    throw IllegalStateException("HTTP $code: $responseText")
                 }
+                val reader = com.google.gson.stream.JsonReader(java.io.StringReader(responseText)).apply {
+                    isLenient = true
+                }
+                gson.fromJson(reader, responseClass)
+            }
         }
 
     suspend fun postForJsonElement(
@@ -102,49 +104,36 @@ class ApiClient(
 		logRequest: Boolean = false
 	): com.google.gson.JsonElement =
         withContext(Dispatchers.IO) {
-                val url = URL(composeUrl(path))
-                val connection = (url.openConnection() as HttpURLConnection).apply {
-                    requestMethod = "POST"
-                    doInput = true
-                    doOutput = true
-                    useCaches = false
-                    setRequestProperty("Content-Type", "application/json; charset=utf-8")
-                    setRequestProperty("Accept", "application/json")
-                    connectTimeout = 5000
-                    readTimeout = 5000
+            val url = composeUrl(path)
+            val json = gson.toJson(body)
+            if (DEBUG_LOGS && logRequest) {
+                Log.d("ApiClient", buildString {
+                    append("REQUEST POST ").append(url)
+                    if (path.isNotEmpty()) append(" (path=").append(path).append(')')
+                    append(" body=").append(formatForLog(json))
+                })
+            }
+            val request = Request.Builder()
+                .url(url)
+                .post(json.toRequestBody(JSON_MEDIA_TYPE))
+                .header("Accept", "application/json")
+                .build()
+
+            client.newCall(request).execute().use { response ->
+                val responseText = response.body?.string() ?: ""
+                val code = response.code
+                if (DEBUG_LOGS && logRequest) {
+                    Log.d("ApiClient", buildString {
+                        append("RESPONSE ").append(code).append(" from ").append(url)
+                        append(" body=").append(formatForLog(responseText))
+                    })
                 }
-                try {
-                    val json = gson.toJson(body)
-                    if (DEBUG_LOGS && logRequest) {
-                        Log.d("ApiClient", buildString {
-                            append("REQUEST POST ").append(url)
-                            if (path.isNotEmpty()) append(" (path=").append(path).append(')')
-                            append(" body=").append(formatForLog(json))
-                        })
-                    }
-                    BufferedWriter(OutputStreamWriter(connection.outputStream, Charsets.UTF_8)).use { w ->
-                        w.write(json)
-                    }
-                    val code = connection.responseCode
-                    val stream = if (code in 200..299) connection.inputStream else connection.errorStream
-                    val responseText = BufferedReader(InputStreamReader(stream, Charsets.UTF_8)).use { br ->
-                        br.readText()
-                    }
-                    if (DEBUG_LOGS && logRequest) {
-                        Log.d("ApiClient", buildString {
-                            append("RESPONSE ").append(code).append(" from ").append(url)
-                            append(" body=").append(formatForLog(responseText))
-                        })
-                    }
-                    // Global server-side error detection
-                    throwIfServerError(responseText, throwOnDialog = false)
-                    if (code !in 200..299) {
-                        throw IllegalStateException("HTTP $code: $responseText")
-                    }
-                    gson.fromJson(responseText, com.google.gson.JsonElement::class.java)
-                } finally {
-                    connection.disconnect()
+                throwIfServerError(responseText, throwOnDialog = false)
+                if (code !in 200..299) {
+                    throw IllegalStateException("HTTP $code: $responseText")
                 }
+                gson.fromJson(responseText, com.google.gson.JsonElement::class.java)
+            }
         }
 
     private fun throwIfServerError(responseText: String, throwOnDialog: Boolean) {
@@ -195,7 +184,6 @@ class ApiClient(
 					if (throwOnDialog) throw ServerDialogShownException()
 					return
 				}
-				// Handle numeric input dialog from server (MessageType="dialognum")
 				if (mt != null && mt.equals("dialognum", ignoreCase = true)) {
 					val formId = if (obj.has("FormId")) obj.get("FormId").asString else ""
 					val header = if (obj.has("DialogHeader")) obj.get("DialogHeader").asString else ""
@@ -223,7 +211,6 @@ class ApiClient(
 					if (throwOnDialog) throw ServerDialogShownException()
 					return
 				}
-				// Handle print command from server
 				if (mt != null && mt.equals("print", ignoreCase = true)) {
 					val formId = if (obj.has("FormId")) obj.get("FormId").asString else ""
 					val picture = if (obj.has("Picture")) obj.get("Picture").asString else ""
@@ -255,7 +242,6 @@ class ApiClient(
 					}
 					return
 				}
-				// Handle select page from server (MessageType="select")
 				if (mt != null && mt.equals("select", ignoreCase = true)) {
 					val formId = if (obj.has("FormId")) obj.get("FormId").asString else ""
 					val headerText = if (obj.has("HeaderText")) obj.get("HeaderText").asString else ""
@@ -336,9 +322,7 @@ class ApiClient(
 				}
                 if (mt != null && mt.equals("error", ignoreCase = true)) {
                     val msg = if (obj.has("Message")) obj.get("Message").asString else "Ошибка"
-					// Emit to global error bus for top-of-screen banner
                     ErrorBus.emit(msg)
-					// Navigate to login if server instructs "Form":"login"
 					if (form != null && form.equals("login", ignoreCase = true)) {
 						AppEventBus.requireLogin()
 					}
@@ -347,17 +331,14 @@ class ApiClient(
             }
         } catch (e: Exception) {
 			if (e is ServerDialogShownException) throw e
-            // Non-JSON or invalid JSON: ignore here, HTTP code handling covers non-JSON errors
+            if (e is IllegalStateException) throw e
         }
     }
 
     private fun composeUrl(path: String): String {
         val base = ApiConfig.baseUrl.trimEnd('/')
-        // Real server expects all requests at root path without endpoints
         return "$base/"
     }
-
-    // Retries disabled by design: each request uses a single attempt with 5s timeouts.
 
     private fun formatForLog(raw: String): String {
         return try {
@@ -405,6 +386,49 @@ class ApiClient(
             arr.forEach { maskRecursive(it) }
         }
     }
+
+    private class DebugEventListener : EventListener() {
+        private var callStartNanos = 0L
+
+        override fun callStart(call: Call) {
+            callStartNanos = System.nanoTime()
+            Log.d("OkHttp", "[callStart] ${call.request().method} ${call.request().url}")
+        }
+
+        override fun connectStart(call: Call, inetSocketAddress: InetSocketAddress, proxy: Proxy) {
+            Log.d("OkHttp", "[connectStart] -> $inetSocketAddress")
+        }
+
+        override fun connectEnd(call: Call, inetSocketAddress: InetSocketAddress, proxy: Proxy, protocol: Protocol?) {
+            Log.d("OkHttp", "[connectEnd] protocol=$protocol")
+        }
+
+        override fun connectionAcquired(call: Call, connection: Connection) {
+            Log.d("OkHttp", "[connectionAcquired] $connection")
+        }
+
+        override fun requestBodyEnd(call: Call, byteCount: Long) {
+            Log.d("OkHttp", "[requestBodyEnd] $byteCount bytes sent")
+        }
+
+        override fun responseHeadersStart(call: Call) {
+            val elapsedMs = (System.nanoTime() - callStartNanos) / 1_000_000
+            Log.d("OkHttp", "[responseHeadersStart] after ${elapsedMs}ms")
+        }
+
+        override fun responseBodyEnd(call: Call, byteCount: Long) {
+            val elapsedMs = (System.nanoTime() - callStartNanos) / 1_000_000
+            Log.d("OkHttp", "[responseBodyEnd] $byteCount bytes in ${elapsedMs}ms")
+        }
+
+        override fun callEnd(call: Call) {
+            val elapsedMs = (System.nanoTime() - callStartNanos) / 1_000_000
+            Log.d("OkHttp", "[callEnd] ${call.request().url} completed in ${elapsedMs}ms")
+        }
+
+        override fun callFailed(call: Call, ioe: IOException) {
+            val elapsedMs = (System.nanoTime() - callStartNanos) / 1_000_000
+            Log.e("OkHttp", "[callFailed] ${call.request().url} after ${elapsedMs}ms", ioe)
+        }
+    }
 }
-
-

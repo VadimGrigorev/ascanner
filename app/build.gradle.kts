@@ -81,6 +81,9 @@ dependencies {
     // JSON
     implementation("com.google.code.gson:gson:2.10.1")
 
+    // HTTP
+    implementation("com.squareup.okhttp3:okhttp:4.12.0")
+
     // CameraX + ML Kit (for camera barcode scanning)
     val cameraxVersion = "1.3.4"
     implementation("androidx.camera:camera-core:$cameraxVersion")

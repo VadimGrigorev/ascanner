@@ -8,8 +8,6 @@ import com.tsd.ascanner.data.printer.TscPrinterService
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
-import java.io.OutputStream
-import java.io.PrintStream
 
 class AScannerApp : Application() {
     lateinit var apiClient: ApiClient
@@ -34,16 +32,6 @@ class AScannerApp : Application() {
 
     override fun onCreate() {
         super.onCreate()
-		// Mute noisy System.out logs from underlying HTTP stack (e.g. OkHttp's internal prints)
-		try {
-			System.setOut(PrintStream(object : OutputStream() {
-				override fun write(b: Int) {
-					// no-op
-				}
-			}))
-		} catch (_: Exception) {
-			// If redirect fails for any reason, just ignore and keep default behavior
-		}
 		instance = this
         apiClient = ApiClient()
         authService = AuthService(apiClient)
