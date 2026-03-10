@@ -243,15 +243,17 @@ fun DocScreen(
         }
     }
 
-	// Auto-refresh every 5 seconds while on this screen (без логов)
-	LaunchedEffect(formId) {
-		while (true) {
-			kotlinx.coroutines.delay(5000)
-			if (!globalLoading.value && !isRequesting.value) {
-				try {
-					// Background refresh must not change screen
-					docsService.fetchDoc(formId, logRequest = false, emitNav = false)
-				} catch (_: Exception) {
+	// Disable periodic polling in debug mode so manual refresh can be used instead.
+	LaunchedEffect(formId, DebugSession.debugModeEnabled) {
+		if (!DebugSession.debugModeEnabled) {
+			while (true) {
+				kotlinx.coroutines.delay(5000)
+				if (!globalLoading.value && !isRequesting.value) {
+					try {
+						// Background refresh must not change screen
+						docsService.fetchDoc(formId, logRequest = false, emitNav = false)
+					} catch (_: Exception) {
+					}
 				}
 			}
 		}
@@ -303,7 +305,7 @@ fun DocScreen(
 			}
 	) {
 		val serverButtons = doc?.buttons.orEmpty()
-		val showRefreshFab = DebugFlags.REFRESH_BUTTONS_ENABLED
+		val showRefreshFab = DebugSession.debugModeEnabled
 		val showCameraFab = DebugFlags.CAMERA_SCAN_ENABLED && DebugSession.debugModeEnabled
 		val hasBottomActions = serverButtons.isNotEmpty() || showRefreshFab || showCameraFab
 		LaunchedEffect(hasBottomActions) {

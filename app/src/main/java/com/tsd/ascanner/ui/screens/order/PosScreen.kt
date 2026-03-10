@@ -201,17 +201,19 @@ fun PosScreen(
 		}
 	}
 
-	// Auto-refresh every 5 seconds while on this screen (без логов)
-	LaunchedEffect(Unit) {
-		while (true) {
-			kotlinx.coroutines.delay(5000)
-			if (!posLoading.value && !isRequesting.value) {
-				val currentFormId = pos?.formId ?: app.docsService.currentPos?.formId
-				if (!currentFormId.isNullOrBlank()) {
-					try {
-						// Background refresh must not change screen
-						app.docsService.fetchPos(currentFormId, logRequest = false, emitNav = false)
-					} catch (_: Exception) {
+	// Disable periodic polling in debug mode so manual refresh can be used instead.
+	LaunchedEffect(DebugSession.debugModeEnabled) {
+		if (!DebugSession.debugModeEnabled) {
+			while (true) {
+				kotlinx.coroutines.delay(5000)
+				if (!posLoading.value && !isRequesting.value) {
+					val currentFormId = pos?.formId ?: app.docsService.currentPos?.formId
+					if (!currentFormId.isNullOrBlank()) {
+						try {
+							// Background refresh must not change screen
+							app.docsService.fetchPos(currentFormId, logRequest = false, emitNav = false)
+						} catch (_: Exception) {
+						}
 					}
 				}
 			}

@@ -204,12 +204,14 @@ fun TasksScreen(
         }
     }
 
-	// Auto-refresh every 5 seconds while screen is visible
-	LaunchedEffect(Unit) {
-		while (true) {
-			kotlinx.coroutines.delay(5000)
-			if (!vm.isLoading) {
-				vm.refresh(userInitiated = false)
+	// Disable periodic polling in debug mode so manual refresh can be used instead.
+	LaunchedEffect(DebugSession.debugModeEnabled) {
+		if (!DebugSession.debugModeEnabled) {
+			while (true) {
+				kotlinx.coroutines.delay(5000)
+				if (!vm.isLoading) {
+					vm.refresh(userInitiated = false)
+				}
 			}
 		}
 	}
@@ -263,7 +265,7 @@ fun TasksScreen(
 			}
 	) {
 		val serverButtons = vm.buttons
-		val showRefreshFab = DebugFlags.REFRESH_BUTTONS_ENABLED
+		val showRefreshFab = DebugSession.debugModeEnabled
 		val showCameraFab = DebugFlags.CAMERA_SCAN_ENABLED && DebugSession.debugModeEnabled
 		val hasBottomActions = serverButtons.isNotEmpty() || showRefreshFab || showCameraFab
 		LaunchedEffect(hasBottomActions) {
