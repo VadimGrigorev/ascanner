@@ -32,6 +32,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -495,10 +496,13 @@ fun SelectScreen(
 					)
 					Spacer(Modifier.width(10.dp))
 					Text(
+						modifier = Modifier.weight(1f),
 						text = lastScan ?: "",
 						color = scanFg,
 						style = MaterialTheme.typography.bodyMedium,
-						fontWeight = FontWeight.SemiBold
+						fontWeight = FontWeight.SemiBold,
+						maxLines = 1,
+						overflow = TextOverflow.Ellipsis
 					)
 				}
 			}

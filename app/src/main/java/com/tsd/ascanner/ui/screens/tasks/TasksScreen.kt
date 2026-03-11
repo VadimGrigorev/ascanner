@@ -554,10 +554,13 @@ fun TasksScreen(
                     )
                     Spacer(Modifier.width(10.dp))
                     Text(
+                        modifier = Modifier.weight(1f),
                         text = lastScan ?: "",
                         color = scanFg,
                         style = MaterialTheme.typography.bodyMedium,
-                        fontWeight = FontWeight.SemiBold
+                        fontWeight = FontWeight.SemiBold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
                     )
                 }
             }

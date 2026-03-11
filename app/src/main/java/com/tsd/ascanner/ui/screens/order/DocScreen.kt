@@ -33,6 +33,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -71,6 +72,7 @@ import com.tsd.ascanner.utils.ScanTriggerBus
 import kotlinx.coroutines.flow.collectLatest
 import com.tsd.ascanner.utils.ErrorBus
 import com.tsd.ascanner.utils.ServerDialogShownException
+import com.tsd.ascanner.utils.ServerErrorResponseException
 import androidx.compose.runtime.LaunchedEffect
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.Lifecycle
@@ -110,35 +112,57 @@ fun DocScreen(
     val isRequesting = remember { mutableStateOf(false) }
     var loadingPosId by remember { mutableStateOf<String?>(null) }
     var loadingButtonItemId by remember { mutableStateOf<String?>(null) }
+    var errorSelectedId by remember { mutableStateOf<String?>(null) }
     var showCamera by remember { mutableStateOf(false) }
     val listState = rememberLazyListState()
 	var bottomActionsHeightPx by remember { mutableStateOf(0) }
 	val density = LocalDensity.current
 	var searchQuery by remember { mutableStateOf("") }
 	var searchFocused by remember { mutableStateOf(false) }
+    val selectionBorderColor = Color.Black
 
     fun handleScan(code: String) {
         val currentFormId = doc?.formId ?: docsService.currentDoc?.formId
         if (code.length < 4 || currentFormId.isNullOrBlank()) return
         lastScan.value = code
         scanError.value = null
+        errorSelectedId = null
         scope.launch {
+            suspend fun scrollToSelectedItem(selectedId: String?) {
+                if (selectedId.isNullOrBlank()) return
+                val items = doc?.items ?: docsService.currentDoc?.items.orEmpty()
+                val idx = items.indexOfFirst { it.id == selectedId }
+                if (idx < 0) return
+
+                // +1 for the header item at the top
+                val targetIndex = idx + 1
+                val total = listState.layoutInfo.totalItemsCount
+                if (targetIndex in 0 until total) {
+                    listState.animateScrollToItem(targetIndex)
+                }
+            }
+
             try {
                 isRequesting.value = true
                 when (val res = docsService.scanMark(currentFormId, code)) {
                     is com.tsd.ascanner.data.docs.ScanDocResult.Success -> {
+                        errorSelectedId = null
                         isScanning.value = false
                     }
                     is com.tsd.ascanner.data.docs.ScanDocResult.Error -> {
+                        errorSelectedId = null
                         scanError.value = res.message
                         isScanning.value = true
                     }
 					is com.tsd.ascanner.data.docs.ScanDocResult.DialogShown -> {
 						// Dialog will be shown via global DialogBus
+						errorSelectedId = null
 						isScanning.value = false
 					}
                 }
             } catch (e: Exception) {
+                errorSelectedId = (e as? ServerErrorResponseException)?.selectedId
+                scrollToSelectedItem(errorSelectedId)
                 scanError.value = e.message ?: "Ошибка запроса"
                 isScanning.value = true
             } finally {
@@ -176,6 +200,7 @@ fun DocScreen(
         globalLoading.value = true
         try {
             docsService.fetchDoc(formId, logRequest = true)
+            errorSelectedId = null
         } catch (_: Exception) {
             // error will be surfaced if user tries to refresh or through separate UI
         } finally {
@@ -230,6 +255,7 @@ fun DocScreen(
                                 globalLoading.value = true
                                 // Background refresh on resume must not change screen
                                 docsService.fetchDoc(formId, logRequest = true, emitNav = false)
+                                errorSelectedId = null
                             } catch (_: Exception) {
                             } finally {
                                 globalLoading.value = false
@@ -252,6 +278,7 @@ fun DocScreen(
 					try {
 						// Background refresh must not change screen
 						docsService.fetchDoc(formId, logRequest = false, emitNav = false)
+                        errorSelectedId = null
 					} catch (_: Exception) {
 					}
 				}
@@ -406,12 +433,14 @@ fun DocScreen(
 				val subColor = colors.textSecondary
                 val isLoadingThis = loadingPosId == it.id
                 val containerColor = if (isLoadingThis) Color(0xFFFFF44F) else bg
+                val isErrorSelected = errorSelectedId == it.id
+                val isServerSelected = !doc?.selectedId.isNullOrBlank() && doc?.selectedId == it.id
                 Card(
                     modifier = Modifier
                         .padding(horizontal = 12.dp, vertical = 6.dp)
                         .then(
-                            if (!doc?.selectedId.isNullOrBlank() && doc?.selectedId == it.id) {
-                                Modifier.border(width = 2.dp, color = Color.Black, shape = MaterialTheme.shapes.medium)
+                            if (isErrorSelected || isServerSelected) {
+                                Modifier.border(width = 2.dp, color = selectionBorderColor, shape = MaterialTheme.shapes.medium)
                             } else {
                                 Modifier
                             }
@@ -530,10 +559,13 @@ fun DocScreen(
                     )
                     Spacer(Modifier.width(10.dp))
                     Text(
+                        modifier = Modifier.weight(1f),
                         text = lastScan.value ?: "",
                         color = scanFg,
                         style = MaterialTheme.typography.bodyMedium,
-                        fontWeight = FontWeight.SemiBold
+                        fontWeight = FontWeight.SemiBold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
                     )
                 }
             }
@@ -660,6 +692,7 @@ fun DocScreen(
 									try {
 										globalLoading.value = true
 										docsService.fetchDoc(formId, logRequest = true)
+                                        errorSelectedId = null
 									} catch (_: Exception) {
 									} finally {
 										globalLoading.value = false

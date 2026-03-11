@@ -14,6 +14,7 @@ import com.tsd.ascanner.utils.ServerDialogButton
 import com.tsd.ascanner.utils.ServerDialogNum
 import com.tsd.ascanner.utils.DialogNumBus
 import com.tsd.ascanner.utils.ServerDialogShownException
+import com.tsd.ascanner.utils.ServerErrorResponseException
 import com.tsd.ascanner.utils.ServerPrintRequest
 import com.tsd.ascanner.utils.ServerSelect
 import com.tsd.ascanner.utils.ServerSelectItem
@@ -322,11 +323,12 @@ class ApiClient(
 				}
                 if (mt != null && mt.equals("error", ignoreCase = true)) {
                     val msg = if (obj.has("Message")) obj.get("Message").asString else "Ошибка"
+                    val selectedId = if (obj.has("SelectedId")) obj.get("SelectedId").asString else null
                     ErrorBus.emit(msg)
 					if (form != null && form.equals("login", ignoreCase = true)) {
 						AppEventBus.requireLogin()
 					}
-                    throw IllegalStateException(msg)
+                    throw ServerErrorResponseException(message = msg, selectedId = selectedId)
                 }
             }
         } catch (e: Exception) {
