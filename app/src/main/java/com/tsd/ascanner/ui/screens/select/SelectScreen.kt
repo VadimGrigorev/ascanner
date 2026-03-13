@@ -54,27 +54,24 @@ import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.viewinterop.AndroidView
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.unit.dp
 import com.tsd.ascanner.AScannerApp
 import com.tsd.ascanner.ui.components.CameraScannerOverlay
 import com.tsd.ascanner.ui.components.ServerActionButtons
 import com.tsd.ascanner.ui.components.parseServerIconOrFallback
-import com.tsd.ascanner.ui.components.SearchScanMode
 import com.tsd.ascanner.ui.components.ServerSearchField
 import com.tsd.ascanner.ui.theme.AppTheme
-import com.tsd.ascanner.data.net.ServerSettings
 import com.tsd.ascanner.ui.theme.statusCardColor
 import com.tsd.ascanner.ui.theme.parseHexColorOrNull
 import com.tsd.ascanner.utils.DebugFlags
 import com.tsd.ascanner.utils.DebugSession
 import com.tsd.ascanner.utils.ErrorBus
+import com.tsd.ascanner.utils.ScanDataBus
 import com.tsd.ascanner.utils.ServerSelect
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.first
-import androidx.compose.foundation.layout.height
 
 @Composable
 fun SelectScreen(
@@ -99,31 +96,11 @@ fun SelectScreen(
 	var searchBoundsInRoot by remember { mutableStateOf<Rect?>(null) }
 	var searchFocused by remember { mutableStateOf(false) }
 	var lastScan by remember { mutableStateOf<String?>(null) }
-	var scanInputView by remember { mutableStateOf<android.widget.EditText?>(null) }
-
-	fun requestScanInputFocus() {
-		// Hardware scanners often behave like keyboard input: without a focused view,
-		// the scan can be "typed" nowhere. On this screen we don't have periodic recompositions,
-		// so we re-request focus explicitly after focus clears / requests finish.
-		val v = scanInputView ?: return
-		v.post {
-			if (!searchFocused && !showCamera) {
-				v.requestFocus()
-				// Keep cursor at end to avoid selecting old text in rare cases.
-				v.setSelection(v.text?.length ?: 0)
-			}
-		}
-	}
 
 	LaunchedEffect(lastScan) {
 		if (!lastScan.isNullOrBlank()) {
 			kotlinx.coroutines.delay(5000)
 			lastScan = null
-		}
-	}
-	LaunchedEffect(sending, searchFocused, showCamera) {
-		if (!sending && !searchFocused && !showCamera) {
-			requestScanInputFocus()
 		}
 	}
 
@@ -165,10 +142,9 @@ fun SelectScreen(
 					val bounds = searchBoundsInRoot
 					if (root != null && bounds != null) {
 						val downInRoot = root.localToRoot(down.position)
-						if (!bounds.contains(downInRoot)) {
-							focusManager.clearFocus()
-							requestScanInputFocus()
-						}
+					if (!bounds.contains(downInRoot)) {
+						focusManager.clearFocus()
+					}
 					}
 					waitForUpOrCancellation()
 				}
@@ -191,73 +167,11 @@ fun SelectScreen(
 			val contextForm = rememberUpdatedState(payload.form)
 			val contextFormId = rememberUpdatedState(payload.formId)
 
-			// Always-on hidden input to catch wedge/scanner text even without focusing search field
-			AndroidView(
-				factory = { ctx2 ->
-					val editText = android.widget.EditText(ctx2).apply {
-						setShowSoftInputOnFocus(false)
-						isSingleLine = true
-						isFocusable = true
-						isFocusableInTouchMode = true
-						inputType = android.text.InputType.TYPE_CLASS_TEXT or
-							android.text.InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD or
-							android.text.InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS
-						imeOptions = android.view.inputmethod.EditorInfo.IME_FLAG_NO_EXTRACT_UI or
-							android.view.inputmethod.EditorInfo.IME_FLAG_NO_FULLSCREEN
-					}
-					scanInputView = editText
-					editText.post { if (!searchFocused) editText.requestFocus() }
-					var debounceJob: kotlinx.coroutines.Job? = null
-					val watcher = object : android.text.TextWatcher {
-						override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
-						override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
-						override fun afterTextChanged(s: android.text.Editable?) {
-							val text = s?.toString() ?: return
-							val idx = text.indexOfFirst { ch ->
-								val code = ch.code
-								((code in 0x00..0x1F) && code != 0x1D) || code == 0x7F
-							}
-							if (idx >= 0) {
-								val code = text.substring(0, idx).trim()
-								if (code.isNotEmpty()) handleScan(contextForm.value, contextFormId.value, code)
-								editText.setText("")
-							} else {
-								if (!ServerSettings.getRingScannerMode(ctx)) {
-									debounceJob?.cancel()
-									debounceJob = scope.launch {
-										kotlinx.coroutines.delay(120)
-										val code = editText.text.toString().trim()
-										if (code.isNotEmpty()) {
-											handleScan(contextForm.value, contextFormId.value, code)
-											editText.setText("")
-										}
-									}
-								}
-							}
-						}
-					}
-					editText.addTextChangedListener(watcher)
-					editText.setOnKeyListener { _, keyCode, event ->
-						if (event.action == android.view.KeyEvent.ACTION_UP &&
-							(keyCode == android.view.KeyEvent.KEYCODE_ENTER || keyCode == android.view.KeyEvent.KEYCODE_TAB)
-						) {
-							val code = editText.text.toString().trim()
-							if (code.isNotEmpty()) handleScan(contextForm.value, contextFormId.value, code)
-							editText.setText("")
-							true
-						} else false
-					}
-					editText
-				},
-				modifier = Modifier
-					.alpha(0f)
-					.fillMaxWidth()
-					.height(1.dp),
-				update = { v ->
-					if (scanInputView !== v) scanInputView = v
-					v.post { if (!searchFocused && !showCamera) v.requestFocus() }
+			LaunchedEffect(Unit) {
+				ScanDataBus.scans.collectLatest { code ->
+					handleScan(contextForm.value, contextFormId.value, code)
 				}
-			)
+			}
 
 			val isSearchAvailable = payload.searchAvailable?.equals("true", ignoreCase = true) == true
 			LaunchedEffect(isSearchAvailable) {
@@ -310,20 +224,17 @@ fun SelectScreen(
 							Text(text = statusText, color = colors.textSecondary, modifier = Modifier.padding(top = 4.dp))
 						}
 						if (isSearchAvailable) {
-							ServerSearchField(
-								visible = true,
-								value = searchQuery,
-								onValueChange = { searchQuery = it },
-								label = "Поиск",
-								scanMode = SearchScanMode.ControlChars,
-								onScan = { code -> handleScan(payload.form, payload.formId, code) },
-								modifier = Modifier
-									.fillMaxWidth()
-									.padding(top = 8.dp)
-									.onGloballyPositioned { searchBoundsInRoot = it.boundsInRoot() }
-								,
-								onFocusChanged = { focused -> searchFocused = focused }
-							)
+						ServerSearchField(
+							visible = true,
+							value = searchQuery,
+							onValueChange = { searchQuery = it },
+							label = "Поиск",
+							modifier = Modifier
+								.fillMaxWidth()
+								.padding(top = 8.dp)
+								.onGloballyPositioned { searchBoundsInRoot = it.boundsInRoot() },
+							onFocusChanged = { focused -> searchFocused = focused }
+						)
 						}
 					}
 				}

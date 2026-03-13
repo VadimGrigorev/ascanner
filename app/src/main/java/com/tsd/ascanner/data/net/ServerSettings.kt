@@ -28,26 +28,6 @@ object ServerSettings {
 			.apply()
 	}
 
-	private const val KEY_RING_SCANNER = "ring_scanner_mode"
-
-	@Volatile
-	private var inMemoryRingScanner: Boolean? = null
-
-	fun getRingScannerMode(context: Context): Boolean {
-		inMemoryRingScanner?.let { return it }
-		val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-		val value = prefs.getBoolean(KEY_RING_SCANNER, false)
-		inMemoryRingScanner = value
-		return value
-	}
-
-	fun setRingScannerMode(context: Context, enabled: Boolean) {
-		inMemoryRingScanner = enabled
-		context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-			.edit()
-			.putBoolean(KEY_RING_SCANNER, enabled)
-			.apply()
-	}
 }
 
 

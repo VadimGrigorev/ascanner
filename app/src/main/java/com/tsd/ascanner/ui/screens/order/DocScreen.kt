@@ -56,8 +56,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.waitForUpOrCancellation
-import androidx.compose.ui.viewinterop.AndroidView
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.layout.height
 import androidx.compose.ui.geometry.Rect
@@ -80,10 +78,9 @@ import androidx.lifecycle.LifecycleEventObserver
 import com.tsd.ascanner.utils.DebugFlags
 import com.tsd.ascanner.utils.DebugSession
 import com.tsd.ascanner.ui.components.ServerActionButtons
-import com.tsd.ascanner.ui.components.SearchScanMode
 import com.tsd.ascanner.ui.components.ServerSearchField
 import com.tsd.ascanner.ui.components.LeftOverlayLazyScrollbar
-import com.tsd.ascanner.data.net.ServerSettings
+import com.tsd.ascanner.utils.ScanDataBus
 import com.tsd.ascanner.ui.theme.statusCardColor
 import com.tsd.ascanner.ui.theme.parseHexColorOrNull
 import androidx.compose.ui.layout.onGloballyPositioned
@@ -376,19 +373,17 @@ fun DocScreen(
                         Text(text = statusText, color = colors.textSecondary, modifier = Modifier.padding(top = 4.dp))
                     }
 					if (isSearchAvailable) {
-						ServerSearchField(
-							visible = true,
-							value = searchQuery,
-							onValueChange = { searchQuery = it },
-							label = "Поиск",
-							scanMode = SearchScanMode.ControlChars,
-							onScan = { code -> handleScan(code) },
-							modifier = Modifier
-								.fillMaxWidth()
-								.padding(top = 8.dp)
-								.onGloballyPositioned { searchBoundsInRoot = it.boundsInRoot() },
-							onFocusChanged = { focused -> searchFocused = focused }
-						)
+					ServerSearchField(
+						visible = true,
+						value = searchQuery,
+						onValueChange = { searchQuery = it },
+						label = "Поиск",
+						modifier = Modifier
+							.fillMaxWidth()
+							.padding(top = 8.dp)
+							.onGloballyPositioned { searchBoundsInRoot = it.boundsInRoot() },
+						onFocusChanged = { focused -> searchFocused = focused }
+					)
 					}
                     val total = doc?.items?.size ?: 0
                     val done = doc?.items?.count { (it.status ?: "").lowercase() == "closed" } ?: 0
@@ -571,69 +566,10 @@ fun DocScreen(
             }
         }
 
-        // Always-on hidden input to catch wedge text even without overlay
-        run {
-            AndroidView(
-                factory = { ctx2 ->
-                    val editText = android.widget.EditText(ctx2).apply {
-                        setShowSoftInputOnFocus(false)
-                        isSingleLine = true
-                        isFocusable = true
-                        isFocusableInTouchMode = true
-                        inputType = android.text.InputType.TYPE_CLASS_TEXT or
-                            android.text.InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD or
-                            android.text.InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS
-                        imeOptions = android.view.inputmethod.EditorInfo.IME_FLAG_NO_EXTRACT_UI or android.view.inputmethod.EditorInfo.IME_FLAG_NO_FULLSCREEN
-                    }
-                    var debounceJob: kotlinx.coroutines.Job? = null
-                    val watcher = object : android.text.TextWatcher {
-                        override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
-                        override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
-                        override fun afterTextChanged(s: android.text.Editable?) {
-                            val text = s?.toString() ?: return
-                            val idx = text.indexOfFirst { ch ->
-                                val code = ch.code
-                                ((code in 0x00..0x1F) && code != 0x1D) || code == 0x7F
-                            }
-                            if (idx >= 0) {
-                                val code = text.substring(0, idx).trim()
-                                if (code.isNotEmpty()) handleScan(code)
-                                editText.setText("")
-                            } else {
-                                if (!isScanning.value && text.length >= 1) isScanning.value = true
-                                if (!ServerSettings.getRingScannerMode(ctx)) {
-                                    debounceJob?.cancel()
-                                    debounceJob = scope.launch {
-                                        kotlinx.coroutines.delay(120)
-                                        val code = editText.text.toString().trim()
-                                        if (code.isNotEmpty()) {
-                                            handleScan(code)
-                                            editText.setText("")
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                    editText.addTextChangedListener(watcher)
-                    editText.setOnKeyListener { _, keyCode, event ->
-                        if (event.action == android.view.KeyEvent.ACTION_UP &&
-                            (keyCode == android.view.KeyEvent.KEYCODE_ENTER || keyCode == android.view.KeyEvent.KEYCODE_TAB)
-                        ) {
-                            val code = editText.text.toString().trim()
-                            if (code.isNotEmpty()) handleScan(code)
-                            editText.setText("")
-                            true
-                        } else false
-                    }
-                    editText
-                },
-                modifier = Modifier
-                    .alpha(0f)
-                    .fillMaxWidth()
-                    .height(1.dp),
-                update = { v -> v.post { if (!searchFocused) v.requestFocus() } }
-            )
+        LaunchedEffect(Unit) {
+            ScanDataBus.scans.collectLatest { code ->
+                handleScan(code)
+            }
         }
 
 		if (hasBottomActions) {

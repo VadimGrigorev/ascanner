@@ -12,8 +12,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
-import androidx.compose.material3.Checkbox
 import androidx.compose.material3.Button
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
@@ -51,9 +51,8 @@ import com.tsd.ascanner.AScannerApp
 import com.tsd.ascanner.utils.ErrorBus
 import com.tsd.ascanner.utils.UserMessageMapper
 import com.tsd.ascanner.utils.DebugSession
-import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.ui.viewinterop.AndroidView
-import androidx.compose.ui.draw.alpha
+import com.tsd.ascanner.utils.ScanDataBus
+import kotlinx.coroutines.flow.collectLatest
 
 class LoginViewModel(
     private val authService: AuthService
@@ -138,7 +137,6 @@ fun LoginScreen(
     val colors = AppTheme.colors
     val ctx = androidx.compose.ui.platform.LocalContext.current
     val app = ctx.applicationContext as AScannerApp
-    val scope = rememberCoroutineScope()
 	var serverUrl by remember { mutableStateOf(ServerSettings.getBaseUrl(ctx)) }
     val vm = viewModel<LoginViewModel>(factory = object : androidx.lifecycle.ViewModelProvider.Factory {
         override fun <T : ViewModel> create(modelClass: Class<T>): T {
@@ -174,87 +172,26 @@ fun LoginScreen(
 		)
 		Spacer(Modifier.height(12.dp))
 
-        // Hidden input to capture hardware scanner text at login screen
-        AndroidView(
-            factory = { ctx ->
-                val editText = android.widget.EditText(ctx).apply {
-                    setShowSoftInputOnFocus(false)
-                    isSingleLine = true
-                    isFocusable = true
-                    isFocusableInTouchMode = true
-                    inputType = android.text.InputType.TYPE_CLASS_TEXT or
-                        android.text.InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD or
-                        android.text.InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS
-                    imeOptions = android.view.inputmethod.EditorInfo.IME_FLAG_NO_EXTRACT_UI or android.view.inputmethod.EditorInfo.IME_FLAG_NO_FULLSCREEN
-                }
-                var debounceJob: kotlinx.coroutines.Job? = null
-                fun commitIfReady(code: String) {
-                    if (code.length < 4) return
-                    scope.launch {
-                        try {
-                            when (val res = app.authService.scanLogin(code)) {
-                                is com.tsd.ascanner.data.auth.LoginResult.Success -> {
-                                    onLoggedIn()
-                                }
-                                is com.tsd.ascanner.data.auth.LoginResult.Error -> {
-                                    ErrorBus.emit(res.message)
-                                }
-								is com.tsd.ascanner.data.auth.LoginResult.DialogShown -> {
-									// Dialog will be shown via global DialogBus
-								}
-                            }
-                        } catch (e: Exception) {
-                            ErrorBus.emit(UserMessageMapper.map(e) ?: e.message ?: "Ошибка сети")
+        LaunchedEffect(Unit) {
+            ScanDataBus.scans.collectLatest { code ->
+                if (code.length < 4) return@collectLatest
+                try {
+                    when (val res = app.authService.scanLogin(code)) {
+                        is com.tsd.ascanner.data.auth.LoginResult.Success -> {
+                            onLoggedIn()
+                        }
+                        is com.tsd.ascanner.data.auth.LoginResult.Error -> {
+                            ErrorBus.emit(res.message)
+                        }
+                        is com.tsd.ascanner.data.auth.LoginResult.DialogShown -> {
+                            // Dialog will be shown via global DialogBus
                         }
                     }
+                } catch (e: Exception) {
+                    ErrorBus.emit(UserMessageMapper.map(e) ?: e.message ?: "Ошибка сети")
                 }
-                val watcher = object : android.text.TextWatcher {
-                    override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
-                    override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
-                    override fun afterTextChanged(s: android.text.Editable?) {
-                        val text = s?.toString() ?: return
-                        val idx = text.indexOfFirst { ch ->
-                            val code = ch.code
-                            ((code in 0x00..0x1F) && code != 0x1D) || code == 0x7F
-                        }
-                        if (idx >= 0) {
-                            val code = text.substring(0, idx).trim()
-                            if (code.isNotEmpty()) commitIfReady(code)
-                            editText.setText("")
-                        } else {
-                            if (!ServerSettings.getRingScannerMode(ctx)) {
-                                debounceJob?.cancel()
-                                debounceJob = scope.launch {
-                                    kotlinx.coroutines.delay(120)
-                                    val code = editText.text.toString().trim()
-                                    if (code.isNotEmpty()) {
-                                        commitIfReady(code)
-                                        editText.setText("")
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-                editText.addTextChangedListener(watcher)
-                editText.setOnKeyListener { _, keyCode, event ->
-                    if (event.action == android.view.KeyEvent.ACTION_UP &&
-                        (keyCode == android.view.KeyEvent.KEYCODE_ENTER || keyCode == android.view.KeyEvent.KEYCODE_TAB)
-                    ) {
-                        val code = editText.text.toString().trim()
-                        if (code.isNotEmpty()) commitIfReady(code)
-                        editText.setText("")
-                        true
-                    } else false
-                }
-                editText
-            },
-            modifier = Modifier
-                .alpha(0f)
-                .fillMaxWidth()
-                .height(1.dp),
-            update = { v -> v.post { v.requestFocus() } }
-        )
+            }
+        }
 
         Text(text = androidx.compose.ui.res.stringResource(id = com.tsd.ascanner.R.string.user_select), color = colors.textPrimary)
         Spacer(Modifier.height(8.dp))
@@ -333,24 +270,6 @@ fun LoginScreen(
 
 		Spacer(Modifier.height(12.dp))
 
-		LaunchedEffect(Unit) {
-			if (ServerSettings.getRingScannerMode(ctx)) {
-				ServerSettings.setRingScannerMode(ctx, false)
-			}
-		}
-		Row(
-			modifier = Modifier.fillMaxWidth(),
-			verticalAlignment = Alignment.CenterVertically
-		) {
-			Checkbox(
-				checked = false,
-				onCheckedChange = null,
-				enabled = false
-			)
-			Spacer(modifier = Modifier.width(8.dp))
-			Text(text = "Кольцо-сканер", color = colors.textSecondary.copy(alpha = 0.38f))
-		}
-
 		Row(
 			modifier = Modifier.fillMaxWidth(),
 			verticalAlignment = Alignment.CenterVertically
@@ -391,7 +310,7 @@ fun LoginScreen(
 			.padding(16.dp)
 	) {
 		Text(
-			text = "2.2 версия",
+			text = "2.3 версия",
 			modifier = Modifier.align(Alignment.BottomStart),
 			color = colors.textSecondary
 		)

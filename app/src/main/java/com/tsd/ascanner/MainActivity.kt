@@ -25,7 +25,12 @@ import com.tsd.ascanner.ui.screens.order.DocScreen
 import com.tsd.ascanner.ui.screens.order.PosScreen
 import com.tsd.ascanner.ui.screens.tasks.TasksScreen
 import com.tsd.ascanner.ui.theme.AScannerTheme
+import android.content.BroadcastReceiver
+import android.content.IntentFilter
 import android.view.KeyEvent
+import com.tsd.ascanner.utils.DataWedge
+import com.tsd.ascanner.utils.Newland
+import com.tsd.ascanner.utils.ScanDataBus
 import com.tsd.ascanner.utils.ScanTriggerBus
 import com.tsd.ascanner.utils.ErrorBus
 import com.tsd.ascanner.utils.DialogBus
@@ -82,10 +87,33 @@ import com.tsd.ascanner.utils.DialogNumBus
 import com.tsd.ascanner.utils.ServerDialogNum
 
 class MainActivity : ComponentActivity() {
+
+    private val scanReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: android.content.Context?, intent: android.content.Intent?) {
+            intent ?: return
+            val barcode = DataWedge.parseScanData(intent)
+                ?: Newland.parseScanData(intent)
+                ?: return
+            ScanDataBus.emit(barcode)
+        }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         WindowCompat.setDecorFitsSystemWindows(window, false)
 		val app = applicationContext as AScannerApp
+
+        DataWedge.configureIntentOutput(this)
+
+        val scanFilter = IntentFilter().apply {
+            addAction(DataWedge.SCAN_ACTION)
+            addAction(Newland.SCAN_RESULT_ACTION)
+        }
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+            registerReceiver(scanReceiver, scanFilter, RECEIVER_EXPORTED)
+        } else {
+            registerReceiver(scanReceiver, scanFilter)
+        }
 
         setContent {
             AScannerTheme(dynamicColor = false) {
@@ -574,6 +602,11 @@ class MainActivity : ComponentActivity() {
             }
         }
         return super.dispatchKeyEvent(event)
+    }
+
+    override fun onDestroy() {
+        runCatching { unregisterReceiver(scanReceiver) }
+        super.onDestroy()
     }
 
     override fun onStop() {
