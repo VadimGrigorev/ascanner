@@ -56,6 +56,7 @@ import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import com.tsd.ascanner.AScannerApp
+import com.tsd.ascanner.ui.components.animateScrollToItemCentered
 import com.tsd.ascanner.ui.components.CameraScannerOverlay
 import com.tsd.ascanner.ui.components.ServerActionButtons
 import com.tsd.ascanner.ui.components.parseServerIconOrFallback
@@ -207,7 +208,7 @@ fun SelectScreen(
 					.filter { total -> targetIndex in 0 until total }
 					.first()
 
-				listState.animateScrollToItem(targetIndex)
+				listState.animateScrollToItemCentered(targetIndex)
 			}
 
 			LazyColumn(

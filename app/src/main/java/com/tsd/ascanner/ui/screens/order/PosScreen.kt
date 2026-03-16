@@ -38,6 +38,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.tsd.ascanner.AScannerApp
+import com.tsd.ascanner.ui.components.animateScrollToItemCentered
 import com.tsd.ascanner.ui.theme.AppTheme
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.graphics.Color
@@ -228,7 +229,7 @@ fun PosScreen(
 				val targetIndex = idx + 1
 				val total = listState.layoutInfo.totalItemsCount
 				if (targetIndex in 0 until total) {
-					listState.animateScrollToItem(targetIndex)
+					listState.animateScrollToItemCentered(targetIndex)
 				}
 			}
 		}

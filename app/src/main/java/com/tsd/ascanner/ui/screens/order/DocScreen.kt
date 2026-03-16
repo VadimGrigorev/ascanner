@@ -46,6 +46,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.tsd.ascanner.AScannerApp
 import com.tsd.ascanner.data.docs.DocsService
+import com.tsd.ascanner.ui.components.animateScrollToItemCentered
 import com.tsd.ascanner.ui.theme.AppTheme
 import androidx.compose.ui.Alignment
 import kotlinx.coroutines.launch
@@ -135,7 +136,7 @@ fun DocScreen(
                 val targetIndex = idx + 1
                 val total = listState.layoutInfo.totalItemsCount
                 if (targetIndex in 0 until total) {
-                    listState.animateScrollToItem(targetIndex)
+                    listState.animateScrollToItemCentered(targetIndex)
                 }
             }
 
@@ -293,7 +294,7 @@ fun DocScreen(
                 val targetIndex = idx + 1
                 val total = listState.layoutInfo.totalItemsCount
                 if (targetIndex in 0 until total) {
-                    listState.animateScrollToItem(targetIndex)
+                    listState.animateScrollToItemCentered(targetIndex)
                 }
             }
         }

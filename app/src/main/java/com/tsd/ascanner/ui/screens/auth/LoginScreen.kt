@@ -100,10 +100,6 @@ class LoginViewModel(
             errorMessage = "Выберите пользователя"
             return
         }
-        if (password.isEmpty()) {
-            errorMessage = "Введите пароль"
-            return
-        }
         loading = true
         errorMessage = null
         viewModelScope.launch {
