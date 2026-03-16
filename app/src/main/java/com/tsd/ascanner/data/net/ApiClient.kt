@@ -197,6 +197,7 @@ class ApiClient(
 						obj.get("NumberScale").asString.toIntOrNull() ?: 3
 					} else 3
 					val numberId = if (obj.has("NumberId")) obj.get("NumberId").asString else ""
+					val defaultText = if (obj.has("DefaultText")) obj.get("DefaultText").asString else ""
 					DialogNumBus.emit(
 						ServerDialogNum(
 							form = form ?: "",
@@ -206,7 +207,8 @@ class ApiClient(
 							status = status,
 							numberLength = numberLength,
 							numberScale = numberScale,
-							numberId = numberId
+							numberId = numberId,
+							defaultText = defaultText
 						)
 					)
 					if (throwOnDialog) throw ServerDialogShownException()

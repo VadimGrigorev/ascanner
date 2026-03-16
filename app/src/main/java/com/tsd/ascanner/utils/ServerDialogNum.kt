@@ -8,5 +8,6 @@ data class ServerDialogNum(
 	val status: String,
 	val numberLength: Int,
 	val numberScale: Int,
-	val numberId: String
+	val numberId: String,
+	val defaultText: String
 )

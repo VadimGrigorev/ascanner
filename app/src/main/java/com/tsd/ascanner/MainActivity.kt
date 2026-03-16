@@ -85,6 +85,13 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.text.input.KeyboardType
 import com.tsd.ascanner.utils.DialogNumBus
 import com.tsd.ascanner.utils.ServerDialogNum
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.type
+import androidx.compose.ui.input.key.onPreviewKeyEvent
 
 class MainActivity : ComponentActivity() {
 
@@ -181,7 +188,7 @@ class MainActivity : ComponentActivity() {
 					DialogNumBus.events.collectLatest { dlgNum ->
 						globalDialogNum = dlgNum
 						dialogNumSending = false
-						dialogNumValue = ""
+						dialogNumValue = dlgNum.defaultText
 					}
 				}
 				LaunchedEffect(Unit) {
@@ -443,6 +450,28 @@ class MainActivity : ComponentActivity() {
 								statusColor = null
 							)
 							val numFg = if (numBg.luminance() < 0.45f) Color.White else Color.Black
+							val dialogNumFocusRequester = remember { FocusRequester() }
+							val validateAndSet: (String) -> Unit = { newVal ->
+								val filtered = newVal.replace(',', '.')
+								val maxIntDigits = dlgNum.numberLength - dlgNum.numberScale
+								val dotIndex = filtered.indexOf('.')
+								if (dotIndex < 0) {
+									if (filtered.length <= maxIntDigits && filtered.all { c -> c.isDigit() }) {
+										dialogNumValue = filtered
+									}
+								} else {
+									val intPart = filtered.substring(0, dotIndex)
+									val fracPart = filtered.substring(dotIndex + 1)
+									if (intPart.length <= maxIntDigits &&
+										fracPart.length <= dlgNum.numberScale &&
+										intPart.all { c -> c.isDigit() } &&
+										fracPart.all { c -> c.isDigit() } &&
+										filtered.count { c -> c == '.' } == 1
+									) {
+										dialogNumValue = filtered
+									}
+								}
+							}
 							AlertDialog(
 								onDismissRequest = { /* non-dismissible */ },
 								properties = DialogProperties(
@@ -461,27 +490,8 @@ class MainActivity : ComponentActivity() {
 										}
 										OutlinedTextField(
 											value = dialogNumValue,
-											onValueChange = { newVal ->
-												val filtered = newVal.replace(',', '.')
-												val maxIntDigits = dlgNum.numberLength - dlgNum.numberScale
-												val dotIndex = filtered.indexOf('.')
-												if (dotIndex < 0) {
-													if (filtered.length <= maxIntDigits && filtered.all { c -> c.isDigit() }) {
-														dialogNumValue = filtered
-													}
-												} else {
-													val intPart = filtered.substring(0, dotIndex)
-													val fracPart = filtered.substring(dotIndex + 1)
-													if (intPart.length <= maxIntDigits &&
-														fracPart.length <= dlgNum.numberScale &&
-														intPart.all { c -> c.isDigit() } &&
-														fracPart.all { c -> c.isDigit() } &&
-														filtered.count { c -> c == '.' } == 1
-													) {
-														dialogNumValue = filtered
-													}
-												}
-											},
+											onValueChange = validateAndSet,
+											readOnly = true,
 											keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
 											singleLine = true,
 											colors = OutlinedTextFieldDefaults.colors(
@@ -491,8 +501,45 @@ class MainActivity : ComponentActivity() {
 												focusedBorderColor = numFg.copy(alpha = 0.7f),
 												unfocusedBorderColor = numFg.copy(alpha = 0.4f)
 											),
-											modifier = Modifier.fillMaxWidth()
+											modifier = Modifier
+												.fillMaxWidth()
+												.focusRequester(dialogNumFocusRequester)
+												.onPreviewKeyEvent { event ->
+													if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
+													when (event.key) {
+														Key.Backspace -> {
+															if (dialogNumValue.isNotEmpty()) {
+																dialogNumValue = dialogNumValue.dropLast(1)
+															}
+															true
+														}
+														else -> {
+															val ch = when (event.key) {
+																Key.Zero, Key.NumPad0 -> '0'
+																Key.One, Key.NumPad1 -> '1'
+																Key.Two, Key.NumPad2 -> '2'
+																Key.Three, Key.NumPad3 -> '3'
+																Key.Four, Key.NumPad4 -> '4'
+																Key.Five, Key.NumPad5 -> '5'
+																Key.Six, Key.NumPad6 -> '6'
+																Key.Seven, Key.NumPad7 -> '7'
+																Key.Eight, Key.NumPad8 -> '8'
+																Key.Nine, Key.NumPad9 -> '9'
+																Key.Period, Key.NumPadDot -> '.'
+																Key.Comma -> ','
+																else -> null
+															}
+															if (ch != null) {
+																validateAndSet(dialogNumValue + ch)
+																true
+															} else false
+														}
+													}
+												}
 										)
+										LaunchedEffect(dlgNum) {
+											dialogNumFocusRequester.requestFocus()
+										}
 									}
 								},
 								confirmButton = {
