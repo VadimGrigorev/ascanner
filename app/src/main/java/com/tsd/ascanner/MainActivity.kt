@@ -30,7 +30,9 @@ import android.content.IntentFilter
 import android.view.KeyEvent
 import com.tsd.ascanner.utils.DataWedge
 import com.tsd.ascanner.utils.Newland
+import com.tsd.ascanner.utils.KeyboardWedgeInterceptor
 import com.tsd.ascanner.utils.ScanDataBus
+import com.tsd.ascanner.utils.ScannerSettings
 import com.tsd.ascanner.utils.ScanTriggerBus
 import com.tsd.ascanner.utils.ErrorBus
 import com.tsd.ascanner.utils.DialogBus
@@ -95,6 +97,8 @@ import androidx.compose.ui.input.key.onPreviewKeyEvent
 
 class MainActivity : ComponentActivity() {
 
+    private val keyboardWedge = KeyboardWedgeInterceptor()
+
     private val scanReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: android.content.Context?, intent: android.content.Intent?) {
             intent ?: return
@@ -110,6 +114,7 @@ class MainActivity : ComponentActivity() {
         WindowCompat.setDecorFitsSystemWindows(window, false)
 		val app = applicationContext as AScannerApp
 
+        ScannerSettings.init(this)
         DataWedge.configureIntentOutput(this)
 
         val scanFilter = IntentFilter().apply {
@@ -646,6 +651,11 @@ class MainActivity : ComponentActivity() {
                 ScanTriggerBus.emitPressed()
             } else if (event.action == KeyEvent.ACTION_UP) {
                 ScanTriggerBus.emitReleased()
+            }
+        }
+        if (ScannerSettings.keyboardModeEnabled) {
+            if (keyboardWedge.onKeyEvent(event) { super.dispatchKeyEvent(it) }) {
+                return true
             }
         }
         return super.dispatchKeyEvent(event)

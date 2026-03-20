@@ -52,6 +52,7 @@ import com.tsd.ascanner.utils.ErrorBus
 import com.tsd.ascanner.utils.UserMessageMapper
 import com.tsd.ascanner.utils.DebugSession
 import com.tsd.ascanner.utils.ScanDataBus
+import com.tsd.ascanner.utils.ScannerSettings
 import kotlinx.coroutines.flow.collectLatest
 
 class LoginViewModel(
@@ -265,6 +266,18 @@ fun LoginScreen(
         }
 
 		Spacer(Modifier.height(12.dp))
+
+		Row(
+			modifier = Modifier.fillMaxWidth(),
+			verticalAlignment = Alignment.CenterVertically
+		) {
+			Checkbox(
+				checked = ScannerSettings.keyboardModeEnabled,
+				onCheckedChange = { ScannerSettings.setKeyboardMode(ctx, it) }
+			)
+			Spacer(modifier = Modifier.width(8.dp))
+			Text(text = "Режим клавиатуры", color = colors.textSecondary)
+		}
 
 		Row(
 			modifier = Modifier.fillMaxWidth(),
