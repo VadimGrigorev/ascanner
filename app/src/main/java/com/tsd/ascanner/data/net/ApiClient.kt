@@ -168,7 +168,8 @@ class ApiClient(
 								val b = el.asJsonObject
 								val name = if (b.has("Name")) b.get("Name").asString else ""
 								val id = if (b.has("Id")) b.get("Id").asString else ""
-								if (id.isNotBlank()) add(ServerDialogButton(name = name.ifBlank { id }, id = id))
+								val btnStatus = if (b.has("Status")) b.get("Status").asString else null
+								if (id.isNotBlank()) add(ServerDialogButton(name = name.ifBlank { id }, id = id, status = btnStatus))
 							}
 						}
 					}
@@ -217,7 +218,8 @@ class ApiClient(
 									name = if (b.has("Name")) b.get("Name").asString else "",
 									id = if (b.has("Id")) b.get("Id").asString else "",
 									icon = if (b.has("Icon")) b.get("Icon").asString else null,
-									color = if (b.has("Color")) b.get("Color").asString else null
+									color = if (b.has("Color")) b.get("Color").asString else null,
+									status = if (b.has("Status")) b.get("Status").asString else null
 								))
 							}
 						}

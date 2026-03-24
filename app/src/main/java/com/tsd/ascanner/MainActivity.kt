@@ -35,6 +35,7 @@ import com.tsd.ascanner.utils.KeyboardWedgeInterceptor
 import com.tsd.ascanner.utils.ScanDataBus
 import com.tsd.ascanner.utils.ScannerSettings
 import com.tsd.ascanner.utils.ScanTriggerBus
+import com.tsd.ascanner.utils.DebugSession
 import com.tsd.ascanner.utils.ErrorBus
 import com.tsd.ascanner.utils.DialogBus
 import com.tsd.ascanner.utils.PrintBus
@@ -53,6 +54,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.Text
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.TextButton
@@ -61,12 +63,14 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.flow.collectLatest
 import androidx.compose.foundation.clickable
 import kotlinx.coroutines.delay
 import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.launch
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.compose.material3.CircularProgressIndicator
 import com.tsd.ascanner.ui.theme.statusCardColor
@@ -97,6 +101,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.isImeVisible
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.input.key.Key
@@ -399,8 +404,15 @@ class MainActivity : ComponentActivity() {
 										val buttons = if (dlg.buttons.isNotEmpty()) dlg.buttons
 										else listOf(com.tsd.ascanner.utils.ServerDialogButton(name = "OK", id = ""))
 										buttons.forEach { b ->
+											val btnBg = if (!b.status.isNullOrBlank()) {
+												statusCardColor(colors = appColors, status = b.status, statusColor = null)
+											} else Color.Transparent
+											val btnFg = if (!b.status.isNullOrBlank() && btnBg.luminance() < 0.45f) Color.White
+												else if (!b.status.isNullOrBlank()) Color.Black
+												else fg
 											TextButton(
 												enabled = !dialogSending,
+												colors = ButtonDefaults.textButtonColors(containerColor = btnBg),
 												onClick = {
 													val clickedDialog = dlg
 													dialogSending = true
@@ -438,7 +450,7 @@ class MainActivity : ComponentActivity() {
 													}
 												}
 											) {
-												Text(text = b.name.ifBlank { "OK" }, color = fg)
+												Text(text = b.name.ifBlank { "OK" }, color = btnFg)
 											}
 										}
 									}
@@ -490,21 +502,42 @@ class MainActivity : ComponentActivity() {
 								return if (newVal.length <= field.fieldLength) newVal else null
 							}
 
-							AlertDialog(
-								onDismissRequest = { /* non-dismissible */ },
-								properties = DialogProperties(
-									dismissOnBackPress = false,
-									dismissOnClickOutside = false
-								),
-								containerColor = numBg,
-								title = {
-									Text(text = dlgNum.header.ifBlank { "Ввод данных" }, color = numFg)
-								},
-							text = {
+					val imeVisible = DebugSession.debugModeEnabled && WindowInsets.isImeVisible
+
+					Dialog(
+						onDismissRequest = { 
+							globalDialogNum = null
+							dialogNumFieldValues = emptyMap()
+							dialogNumSending = false
+						},
+						properties = DialogProperties(
+							dismissOnBackPress = true,
+							dismissOnClickOutside = false
+						)
+					) {
+						Card(
+							modifier = Modifier.fillMaxWidth(),
+							shape = RoundedCornerShape(16.dp),
+							colors = CardDefaults.cardColors(containerColor = numBg)
+						) {
+							Column(
+								modifier = Modifier
+									.fillMaxWidth()
+									.padding(12.dp)
+							) {
+								if (!imeVisible) {
+									Text(
+										text = dlgNum.header.ifBlank { "Ввод данных" },
+										color = numFg,
+										style = MaterialTheme.typography.headlineSmall,
+										modifier = Modifier.padding(bottom = 8.dp)
+									)
+								}
+
 								val renderField: @Composable (Int, com.tsd.ascanner.utils.DialogNumEditField, Modifier) -> Unit = { idx, field, baseModifier ->
-									val currentVal = dialogNumFieldValues[idx] ?: ""
-									val isNumber = field.fieldType.equals("Number", ignoreCase = true)
-									OutlinedTextField(
+								val currentVal = dialogNumFieldValues[idx] ?: ""
+								val isNumber = field.fieldType.equals("Number", ignoreCase = true)
+								OutlinedTextField(
 										value = currentVal,
 										onValueChange = { newVal ->
 											val validated = if (isNumber) validateNumericField(field, newVal) else validateStringField(field, newVal)
@@ -513,10 +546,11 @@ class MainActivity : ComponentActivity() {
 											}
 										},
 										label = if (field.text.isNotBlank()) { { Text(field.text) } } else null,
-										readOnly = isNumber,
+										readOnly = isNumber && !DebugSession.debugModeEnabled,
 										keyboardOptions = if (isNumber) KeyboardOptions(keyboardType = KeyboardType.Decimal)
 											else KeyboardOptions.Default,
 										singleLine = true,
+										textStyle = LocalTextStyle.current.copy(fontSize = 18.sp),
 										colors = OutlinedTextFieldDefaults.colors(
 											focusedTextColor = numFg,
 											unfocusedTextColor = numFg,
@@ -526,9 +560,9 @@ class MainActivity : ComponentActivity() {
 											focusedBorderColor = numFg.copy(alpha = 0.7f),
 											unfocusedBorderColor = numFg.copy(alpha = 0.4f)
 										),
-										modifier = baseModifier
-											.then(if (idx == 0) Modifier.focusRequester(firstFieldFocusRequester) else Modifier)
-											.then(if (isNumber) Modifier.onPreviewKeyEvent { event ->
+									modifier = baseModifier
+										.then(if (idx == 0) Modifier.focusRequester(firstFieldFocusRequester) else Modifier)
+										.then(if (isNumber) Modifier.onPreviewKeyEvent { event ->
 												if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
 												when (event.key) {
 													Key.Backspace -> {
@@ -569,7 +603,7 @@ class MainActivity : ComponentActivity() {
 								}
 								Column(modifier = Modifier.heightIn(max = 400.dp).verticalScroll(rememberScrollState())) {
 										if (dlgNum.text.isNotBlank()) {
-											Text(text = dlgNum.text, color = numFg)
+											Text(text = dlgNum.text, color = numFg, fontSize = 17.sp)
 											Spacer(Modifier.padding(top = 4.dp))
 										}
 									val indexedFields = dlgNum.editFields.mapIndexed { idx, f -> idx to f }
@@ -599,19 +633,24 @@ class MainActivity : ComponentActivity() {
 											}
 										}
 									}
-										LaunchedEffect(dlgNum) {
-											firstFieldFocusRequester.requestFocus()
-										}
+								LaunchedEffect(dlgNum) {
+									if (!DebugSession.debugModeEnabled) {
+										firstFieldFocusRequester.requestFocus()
 									}
-								},
-							confirmButton = {
-								val buttons = if (dlgNum.buttons.isNotEmpty()) dlgNum.buttons
-									else listOf(com.tsd.ascanner.utils.DialogNumButton(name = "OK", id = ""))
-								Column(verticalArrangement = Arrangement.spacedBy(2.dp), modifier = Modifier.fillMaxWidth()) {
+								}
+								} // close scrollable Column
+								
+								if (!imeVisible) {
+									Spacer(modifier = Modifier.padding(top = 16.dp))
+									val buttons = if (dlgNum.buttons.isNotEmpty()) dlgNum.buttons
+										else listOf(com.tsd.ascanner.utils.DialogNumButton(name = "OK", id = ""))
+									Column(verticalArrangement = Arrangement.spacedBy(2.dp), modifier = Modifier.fillMaxWidth()) {
 									buttons.chunked(2).forEach { rowButtons ->
 										Row(horizontalArrangement = Arrangement.spacedBy(4.dp), modifier = Modifier.fillMaxWidth()) {
 											rowButtons.forEach { b ->
-												val btnColor = parseHexColorOrNull(b.color)
+												val btnColor = parseHexColorOrNull(b.color) ?: if (!b.status.isNullOrBlank()) {
+													statusCardColor(colors = appColors, status = b.status, statusColor = null)
+												} else null
 												val btnFg = if (btnColor != null && btnColor.luminance() < 0.45f) Color.White
 													else if (btnColor != null) Color.Black
 													else numFg
@@ -675,7 +714,11 @@ class MainActivity : ComponentActivity() {
 														Icon(imageVector = iconVec, contentDescription = null, tint = btnFg, modifier = Modifier.size(18.dp))
 														Spacer(Modifier.width(4.dp))
 													}
-													Text(text = b.name.ifBlank { "OK" }, color = btnFg)
+													Text(
+														text = b.name.ifBlank { "OK" },
+														color = btnFg,
+														fontSize = (MaterialTheme.typography.labelLarge.fontSize.value + 2).sp
+													)
 												}
 											}
 											if (rowButtons.size == 1) Spacer(Modifier.weight(1f))
@@ -683,7 +726,9 @@ class MainActivity : ComponentActivity() {
 									}
 								}
 							}
-							)
+						}
+					}
+				}
 
 							if (dialogNumSending) {
 								Box(modifier = Modifier.fillMaxSize()) {

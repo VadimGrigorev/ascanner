@@ -13,7 +13,8 @@ data class ServerDialog(
 
 data class ServerDialogButton(
 	val name: String,
-	val id: String
+	val id: String,
+	val status: String? = null
 )
 
 

@@ -13,7 +13,8 @@ data class DialogNumButton(
 	val name: String,
 	val id: String,
 	val icon: String? = null,
-	val color: String? = null
+	val color: String? = null,
+	val status: String? = null
 )
 
 data class ServerDialogNum(
