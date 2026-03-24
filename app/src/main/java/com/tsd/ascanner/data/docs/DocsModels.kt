@@ -160,14 +160,18 @@ data class SelectRequest(
 	@SerializedName("SelectedId") val selectedId: String
 )
 
-// Request triggered by numeric input dialog (MessageType="dialognum")
+data class DialogNumEditFieldValue(
+	@SerializedName("FieldId") val fieldId: String,
+	@SerializedName("Value") val value: String
+)
+
 data class DialogNumRequest(
 	@SerializedName("Bearer") val bearer: String,
 	@SerializedName("Form") val form: String,
 	@SerializedName("FormId") val formId: String,
 	@SerializedName("Request") val request: String = "select",
 	@SerializedName("SelectedId") val selectedId: String,
-	@SerializedName("Number") val number: String
+	@SerializedName("EditFields") val editFields: List<DialogNumEditFieldValue>
 )
 
 // Request triggered by scanning into search field on select page

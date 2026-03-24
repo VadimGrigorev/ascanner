@@ -5,7 +5,53 @@
  "DialogHeader":"Вопрос",
  "DialogText":"Введите необходимое количество:",
  "Status":"warning",
- "NumberLength":"15",
- "NumberScale":"3",
- "NumberId":"2025_ОЗ0000058104_000000060234/000000000149_N"
+ "EditFields":[
+   {
+   "Text":"Количество в упаковках",
+   "FieldType":"Number",
+   "DefaultText":"15",
+   "FieldLength":"15",
+   "FieldScale":"3",
+   "FieldId":"2025_ОЗ0000058104_000000060234/000000000149_N"
+   },
+   {
+   "Text":"Количество в штуках",
+   "FieldType":"Number",
+   "DefaultText":"15",
+   "FieldLength":"15",
+   "FieldScale":"3",
+   "FieldId":"2025_ОЗ0000058104_000000060234/000000000149_N"
+   },
+   {
+   "Text":"Комментарий",
+   "FieldType":"String",
+   "DefaultText":"...",
+   "FieldLength":"200",
+   "FieldId":"2025_ОЗ0000058104_000000060234/000000000149_N"
+   }
+ ],
+ "Buttons":[
+   {
+     "Name":"Изменить",
+     "Id":"2025_ОЗ0000058104_D_00007210000000176259_Yes",
+     "Icon":"icons.outlined.delete",
+     "Color":"008F00"
+   },
+   {
+     "Name":"Добавить",
+     "Id":"2025_ОЗ0000058104_D_00007210000000176259_Yes",
+     "Icon":"icons.outlined.delete",
+     "Color":"008F00"
+   },
+   {
+     "Name":"Отнять",
+     "Id":"2025_ОЗ0000058104_D_00007210000000176259_Yes",
+     "Icon":"icons.outlined.delete",
+     "Color":"008F00"
+   },
+   {
+     "Name":"Отмена",
+     "Id":"2025_ОЗ0000058104_D_00007210000000176259_Cancel"
+   }
+ ]
 }

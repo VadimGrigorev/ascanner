@@ -409,9 +409,9 @@ class DocsService(
 		}
 	}
 
-	suspend fun sendDialogNum(form: String, formId: String, numberId: String, number: String): ButtonResult {
+	suspend fun sendDialogNum(form: String, formId: String, selectedId: String, editFields: List<DialogNumEditFieldValue>): ButtonResult {
 		val bearer = authService.bearer ?: return ButtonResult.Error("Нет токена авторизации")
-		val req = DialogNumRequest(bearer = bearer, form = form, formId = formId, selectedId = numberId, number = number)
+		val req = DialogNumRequest(bearer = bearer, form = form, formId = formId, selectedId = selectedId, editFields = editFields)
 		return try {
 			val element = apiClient.postForJsonElement("/button", req, logRequest = true)
 			if (!element.isJsonObject) return ButtonResult.Success

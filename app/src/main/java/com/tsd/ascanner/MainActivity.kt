@@ -3,6 +3,7 @@ package com.tsd.ascanner
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.compose.runtime.Composable
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.getValue
@@ -74,8 +75,11 @@ import com.tsd.ascanner.ui.screens.select.SelectScreen
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Warning
 import androidx.compose.material3.Icon
+import androidx.compose.foundation.layout.size
+import com.tsd.ascanner.ui.components.parseServerIconOrFallback
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -87,6 +91,12 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.text.input.KeyboardType
 import com.tsd.ascanner.utils.DialogNumBus
 import com.tsd.ascanner.utils.ServerDialogNum
+import com.tsd.ascanner.data.docs.DialogNumEditFieldValue
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.input.key.Key
@@ -95,6 +105,7 @@ import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 
+@OptIn(ExperimentalLayoutApi::class)
 class MainActivity : ComponentActivity() {
 
     private val keyboardWedge = KeyboardWedgeInterceptor()
@@ -142,7 +153,7 @@ class MainActivity : ComponentActivity() {
 				var globalSelect by remember { mutableStateOf<ServerSelect?>(null) }
 				var globalDialogNum by remember { mutableStateOf<ServerDialogNum?>(null) }
 				var dialogNumSending by remember { mutableStateOf(false) }
-				var dialogNumValue by remember { mutableStateOf("") }
+				var dialogNumFieldValues by remember { mutableStateOf<Map<Int, String>>(emptyMap()) }
 				val scope = rememberCoroutineScope()
                 LaunchedEffect(Unit) {
                     ErrorBus.events.collectLatest { msg ->
@@ -188,12 +199,11 @@ class MainActivity : ComponentActivity() {
 						}
 					}
 				}
-				// Handle numeric input dialogs from server (MessageType="dialognum")
 				LaunchedEffect(Unit) {
 					DialogNumBus.events.collectLatest { dlgNum ->
 						globalDialogNum = dlgNum
 						dialogNumSending = false
-						dialogNumValue = dlgNum.defaultText
+						dialogNumFieldValues = dlgNum.editFields.mapIndexed { idx, f -> idx to f.defaultText }.toMap()
 					}
 				}
 				LaunchedEffect(Unit) {
@@ -455,28 +465,31 @@ class MainActivity : ComponentActivity() {
 								statusColor = null
 							)
 							val numFg = if (numBg.luminance() < 0.45f) Color.White else Color.Black
-							val dialogNumFocusRequester = remember { FocusRequester() }
-							val validateAndSet: (String) -> Unit = { newVal ->
+							val firstFieldFocusRequester = remember { FocusRequester() }
+
+							fun validateNumericField(field: com.tsd.ascanner.utils.DialogNumEditField, newVal: String): String? {
 								val filtered = newVal.replace(',', '.')
-								val maxIntDigits = dlgNum.numberLength - dlgNum.numberScale
+								val maxIntDigits = field.fieldLength - field.fieldScale
 								val dotIndex = filtered.indexOf('.')
 								if (dotIndex < 0) {
-									if (filtered.length <= maxIntDigits && filtered.all { c -> c.isDigit() }) {
-										dialogNumValue = filtered
-									}
+									if (filtered.length <= maxIntDigits && filtered.all { c -> c.isDigit() }) return filtered
 								} else {
 									val intPart = filtered.substring(0, dotIndex)
 									val fracPart = filtered.substring(dotIndex + 1)
 									if (intPart.length <= maxIntDigits &&
-										fracPart.length <= dlgNum.numberScale &&
+										fracPart.length <= field.fieldScale &&
 										intPart.all { c -> c.isDigit() } &&
 										fracPart.all { c -> c.isDigit() } &&
 										filtered.count { c -> c == '.' } == 1
-									) {
-										dialogNumValue = filtered
-									}
+									) return filtered
 								}
+								return null
 							}
+
+							fun validateStringField(field: com.tsd.ascanner.utils.DialogNumEditField, newVal: String): String? {
+								return if (newVal.length <= field.fieldLength) newVal else null
+							}
+
 							AlertDialog(
 								onDismissRequest = { /* non-dismissible */ },
 								properties = DialogProperties(
@@ -485,125 +498,191 @@ class MainActivity : ComponentActivity() {
 								),
 								containerColor = numBg,
 								title = {
-									Text(text = dlgNum.header.ifBlank { "Ввод количества" }, color = numFg)
+									Text(text = dlgNum.header.ifBlank { "Ввод данных" }, color = numFg)
 								},
-								text = {
-									Column {
-										if (dlgNum.text.isNotBlank()) {
-											Text(text = dlgNum.text, color = numFg)
-											Spacer(Modifier.padding(top = 8.dp))
-										}
-										OutlinedTextField(
-											value = dialogNumValue,
-											onValueChange = validateAndSet,
-											readOnly = true,
-											keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-											singleLine = true,
-											colors = OutlinedTextFieldDefaults.colors(
-												focusedTextColor = numFg,
-												unfocusedTextColor = numFg,
-												cursorColor = numFg,
-												focusedBorderColor = numFg.copy(alpha = 0.7f),
-												unfocusedBorderColor = numFg.copy(alpha = 0.4f)
-											),
-											modifier = Modifier
-												.fillMaxWidth()
-												.focusRequester(dialogNumFocusRequester)
-												.onPreviewKeyEvent { event ->
-													if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
-													when (event.key) {
-														Key.Backspace -> {
-															if (dialogNumValue.isNotEmpty()) {
-																dialogNumValue = dialogNumValue.dropLast(1)
+							text = {
+								val renderField: @Composable (Int, com.tsd.ascanner.utils.DialogNumEditField, Modifier) -> Unit = { idx, field, baseModifier ->
+									val currentVal = dialogNumFieldValues[idx] ?: ""
+									val isNumber = field.fieldType.equals("Number", ignoreCase = true)
+									OutlinedTextField(
+										value = currentVal,
+										onValueChange = { newVal ->
+											val validated = if (isNumber) validateNumericField(field, newVal) else validateStringField(field, newVal)
+											if (validated != null) {
+												dialogNumFieldValues = dialogNumFieldValues.toMutableMap().apply { put(idx, validated) }
+											}
+										},
+										label = if (field.text.isNotBlank()) { { Text(field.text) } } else null,
+										readOnly = isNumber,
+										keyboardOptions = if (isNumber) KeyboardOptions(keyboardType = KeyboardType.Decimal)
+											else KeyboardOptions.Default,
+										singleLine = true,
+										colors = OutlinedTextFieldDefaults.colors(
+											focusedTextColor = numFg,
+											unfocusedTextColor = numFg,
+											cursorColor = numFg,
+											focusedLabelColor = numFg.copy(alpha = 0.7f),
+											unfocusedLabelColor = numFg.copy(alpha = 0.7f),
+											focusedBorderColor = numFg.copy(alpha = 0.7f),
+											unfocusedBorderColor = numFg.copy(alpha = 0.4f)
+										),
+										modifier = baseModifier
+											.then(if (idx == 0) Modifier.focusRequester(firstFieldFocusRequester) else Modifier)
+											.then(if (isNumber) Modifier.onPreviewKeyEvent { event ->
+												if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
+												when (event.key) {
+													Key.Backspace -> {
+														val cur = dialogNumFieldValues[idx] ?: ""
+														if (cur.isNotEmpty()) {
+															dialogNumFieldValues = dialogNumFieldValues.toMutableMap().apply { put(idx, cur.dropLast(1)) }
+														}
+														true
+													}
+													else -> {
+														val ch = when (event.key) {
+															Key.Zero, Key.NumPad0 -> '0'
+															Key.One, Key.NumPad1 -> '1'
+															Key.Two, Key.NumPad2 -> '2'
+															Key.Three, Key.NumPad3 -> '3'
+															Key.Four, Key.NumPad4 -> '4'
+															Key.Five, Key.NumPad5 -> '5'
+															Key.Six, Key.NumPad6 -> '6'
+															Key.Seven, Key.NumPad7 -> '7'
+															Key.Eight, Key.NumPad8 -> '8'
+															Key.Nine, Key.NumPad9 -> '9'
+															Key.Period, Key.NumPadDot -> '.'
+															Key.Comma -> ','
+															else -> null
+														}
+														if (ch != null) {
+															val cur = dialogNumFieldValues[idx] ?: ""
+															val validated = validateNumericField(field, cur + ch)
+															if (validated != null) {
+																dialogNumFieldValues = dialogNumFieldValues.toMutableMap().apply { put(idx, validated) }
 															}
 															true
-														}
-														else -> {
-															val ch = when (event.key) {
-																Key.Zero, Key.NumPad0 -> '0'
-																Key.One, Key.NumPad1 -> '1'
-																Key.Two, Key.NumPad2 -> '2'
-																Key.Three, Key.NumPad3 -> '3'
-																Key.Four, Key.NumPad4 -> '4'
-																Key.Five, Key.NumPad5 -> '5'
-																Key.Six, Key.NumPad6 -> '6'
-																Key.Seven, Key.NumPad7 -> '7'
-																Key.Eight, Key.NumPad8 -> '8'
-																Key.Nine, Key.NumPad9 -> '9'
-																Key.Period, Key.NumPadDot -> '.'
-																Key.Comma -> ','
-																else -> null
-															}
-															if (ch != null) {
-																validateAndSet(dialogNumValue + ch)
-																true
-															} else false
-														}
+														} else false
 													}
 												}
-										)
+											} else Modifier)
+									)
+								}
+								Column(modifier = Modifier.heightIn(max = 400.dp).verticalScroll(rememberScrollState())) {
+										if (dlgNum.text.isNotBlank()) {
+											Text(text = dlgNum.text, color = numFg)
+											Spacer(Modifier.padding(top = 4.dp))
+										}
+									val indexedFields = dlgNum.editFields.mapIndexed { idx, f -> idx to f }
+									val fieldGroups = mutableListOf<MutableList<Pair<Int, com.tsd.ascanner.utils.DialogNumEditField>>>()
+									for (pair in indexedFields) {
+										val isNum = pair.second.fieldType.equals("Number", ignoreCase = true)
+										val lastGroup = fieldGroups.lastOrNull()
+										val lastIsNum = lastGroup?.first()?.second?.fieldType?.equals("Number", ignoreCase = true) == true
+										if (lastGroup != null && isNum && lastIsNum) {
+											lastGroup.add(pair)
+										} else {
+											fieldGroups.add(mutableListOf(pair))
+										}
+									}
+									fieldGroups.forEachIndexed { gi, group ->
+										if (gi > 0) Spacer(Modifier.padding(top = 2.dp))
+										val isNumGroup = group.first().second.fieldType.equals("Number", ignoreCase = true)
+										if (isNumGroup && group.size > 1) {
+											Row(horizontalArrangement = Arrangement.spacedBy(4.dp), modifier = Modifier.fillMaxWidth()) {
+												group.forEach { (idx, field) ->
+													renderField(idx, field, Modifier.weight(1f))
+												}
+											}
+										} else {
+											group.forEach { (idx, field) ->
+												renderField(idx, field, Modifier.fillMaxWidth())
+											}
+										}
+									}
 										LaunchedEffect(dlgNum) {
-											dialogNumFocusRequester.requestFocus()
+											firstFieldFocusRequester.requestFocus()
 										}
 									}
 								},
-								confirmButton = {
-									Row(
-										horizontalArrangement = Arrangement.spacedBy(8.dp),
-										verticalAlignment = Alignment.CenterVertically
-									) {
-										TextButton(
-											onClick = {
-												globalDialogNum = null
-												dialogNumValue = ""
-												dialogNumSending = false
-											}
-										) {
-											Text(text = "Отмена", color = numFg)
-										}
-										TextButton(
-											enabled = !dialogNumSending && dialogNumValue.isNotBlank(),
-											onClick = {
-												val clickedDlg = dlgNum
-												dialogNumSending = true
-												scope.launch {
-													try {
-														when (val res = app.docsService.sendDialogNum(
-															form = dlgNum.form,
-															formId = dlgNum.formId,
-															numberId = dlgNum.numberId,
-															number = dialogNumValue
-														)) {
-															is com.tsd.ascanner.data.docs.ButtonResult.Success -> {
-																if (globalDialogNum === clickedDlg) {
-																	globalDialogNum = null
-																	dialogNumValue = ""
+							confirmButton = {
+								val buttons = if (dlgNum.buttons.isNotEmpty()) dlgNum.buttons
+									else listOf(com.tsd.ascanner.utils.DialogNumButton(name = "OK", id = ""))
+								Column(verticalArrangement = Arrangement.spacedBy(2.dp), modifier = Modifier.fillMaxWidth()) {
+									buttons.chunked(2).forEach { rowButtons ->
+										Row(horizontalArrangement = Arrangement.spacedBy(4.dp), modifier = Modifier.fillMaxWidth()) {
+											rowButtons.forEach { b ->
+												val btnColor = parseHexColorOrNull(b.color)
+												val btnFg = if (btnColor != null && btnColor.luminance() < 0.45f) Color.White
+													else if (btnColor != null) Color.Black
+													else numFg
+												TextButton(
+													enabled = !dialogNumSending,
+													modifier = Modifier.weight(1f).heightIn(min = 44.dp),
+													colors = ButtonDefaults.textButtonColors(
+														containerColor = btnColor ?: Color.Transparent
+													),
+													onClick = {
+														if (b.id.isBlank()) {
+															globalDialogNum = null
+															dialogNumFieldValues = emptyMap()
+															dialogNumSending = false
+															return@TextButton
+														}
+														val clickedDlg = dlgNum
+														dialogNumSending = true
+														scope.launch {
+															try {
+																val fields = dlgNum.editFields.mapIndexed { idx, ef ->
+																	DialogNumEditFieldValue(
+																		fieldId = ef.fieldId,
+																		value = dialogNumFieldValues[idx] ?: ""
+																	)
 																}
-															}
-															is com.tsd.ascanner.data.docs.ButtonResult.DialogShown -> {
-																if (globalDialogNum === clickedDlg) {
-																	globalDialogNum = null
-																	dialogNumValue = ""
+																when (val res = app.docsService.sendDialogNum(
+																	form = dlgNum.form,
+																	formId = dlgNum.formId,
+																	selectedId = b.id,
+																	editFields = fields
+																)) {
+																	is com.tsd.ascanner.data.docs.ButtonResult.Success -> {
+																		if (globalDialogNum === clickedDlg) {
+																			globalDialogNum = null
+																			dialogNumFieldValues = emptyMap()
+																		}
+																	}
+																	is com.tsd.ascanner.data.docs.ButtonResult.DialogShown -> {
+																		if (globalDialogNum === clickedDlg) {
+																			globalDialogNum = null
+																			dialogNumFieldValues = emptyMap()
+																		}
+																	}
+																	is com.tsd.ascanner.data.docs.ButtonResult.Error -> {
+																		if (globalDialogNum === clickedDlg) {
+																			globalDialogNum = null
+																			dialogNumFieldValues = emptyMap()
+																		}
+																		ErrorBus.emit(res.message)
+																	}
 																}
-															}
-															is com.tsd.ascanner.data.docs.ButtonResult.Error -> {
-																if (globalDialogNum === clickedDlg) {
-																	globalDialogNum = null
-																	dialogNumValue = ""
-																}
-																ErrorBus.emit(res.message)
+															} finally {
+																dialogNumSending = false
 															}
 														}
-													} finally {
-														dialogNumSending = false
 													}
+												) {
+													val iconVec = b.icon?.takeIf { it.isNotBlank() }?.let { parseServerIconOrFallback(it) }
+													if (iconVec != null) {
+														Icon(imageVector = iconVec, contentDescription = null, tint = btnFg, modifier = Modifier.size(18.dp))
+														Spacer(Modifier.width(4.dp))
+													}
+													Text(text = b.name.ifBlank { "OK" }, color = btnFg)
 												}
 											}
-										) {
-											Text(text = "OK", color = numFg)
+											if (rowButtons.size == 1) Spacer(Modifier.weight(1f))
 										}
 									}
 								}
+							}
 							)
 
 							if (dialogNumSending) {

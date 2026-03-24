@@ -12,6 +12,8 @@ import com.tsd.ascanner.utils.SelectBus
 import com.tsd.ascanner.utils.ServerDialog
 import com.tsd.ascanner.utils.ServerDialogButton
 import com.tsd.ascanner.utils.ServerDialogNum
+import com.tsd.ascanner.utils.DialogNumEditField
+import com.tsd.ascanner.utils.DialogNumButton
 import com.tsd.ascanner.utils.DialogNumBus
 import com.tsd.ascanner.utils.ServerDialogShownException
 import com.tsd.ascanner.utils.ServerErrorResponseException
@@ -190,14 +192,36 @@ class ApiClient(
 					val header = if (obj.has("DialogHeader")) obj.get("DialogHeader").asString else ""
 					val text = if (obj.has("DialogText")) obj.get("DialogText").asString else ""
 					val status = if (obj.has("Status")) obj.get("Status").asString else ""
-					val numberLength = if (obj.has("NumberLength")) {
-						obj.get("NumberLength").asString.toIntOrNull() ?: 15
-					} else 15
-					val numberScale = if (obj.has("NumberScale")) {
-						obj.get("NumberScale").asString.toIntOrNull() ?: 3
-					} else 3
-					val numberId = if (obj.has("NumberId")) obj.get("NumberId").asString else ""
-					val defaultText = if (obj.has("DefaultText")) obj.get("DefaultText").asString else ""
+					val editFields = buildList {
+						if (obj.has("EditFields") && obj.get("EditFields").isJsonArray) {
+							for (el in obj.getAsJsonArray("EditFields")) {
+								if (!el.isJsonObject) continue
+								val f = el.asJsonObject
+								add(DialogNumEditField(
+									text = if (f.has("Text")) f.get("Text").asString else "",
+									fieldType = if (f.has("FieldType")) f.get("FieldType").asString else "String",
+									defaultText = if (f.has("DefaultText")) f.get("DefaultText").asString else "",
+									fieldLength = if (f.has("FieldLength")) f.get("FieldLength").asString.toIntOrNull() ?: 15 else 15,
+									fieldScale = if (f.has("FieldScale")) f.get("FieldScale").asString.toIntOrNull() ?: 3 else 0,
+									fieldId = if (f.has("FieldId")) f.get("FieldId").asString else ""
+								))
+							}
+						}
+					}
+					val buttons = buildList {
+						if (obj.has("Buttons") && obj.get("Buttons").isJsonArray) {
+							for (el in obj.getAsJsonArray("Buttons")) {
+								if (!el.isJsonObject) continue
+								val b = el.asJsonObject
+								add(DialogNumButton(
+									name = if (b.has("Name")) b.get("Name").asString else "",
+									id = if (b.has("Id")) b.get("Id").asString else "",
+									icon = if (b.has("Icon")) b.get("Icon").asString else null,
+									color = if (b.has("Color")) b.get("Color").asString else null
+								))
+							}
+						}
+					}
 					DialogNumBus.emit(
 						ServerDialogNum(
 							form = form ?: "",
@@ -205,10 +229,8 @@ class ApiClient(
 							header = header,
 							text = text,
 							status = status,
-							numberLength = numberLength,
-							numberScale = numberScale,
-							numberId = numberId,
-							defaultText = defaultText
+							editFields = editFields,
+							buttons = buttons
 						)
 					)
 					if (throwOnDialog) throw ServerDialogShownException()
