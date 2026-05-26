@@ -46,6 +46,7 @@ import com.tsd.ascanner.utils.ServerSelect
 import com.tsd.ascanner.utils.AppEvent
 import com.tsd.ascanner.utils.AppEventBus
 import com.tsd.ascanner.ui.components.PrinterDialog
+import com.tsd.ascanner.ui.components.AutoPrintOverlay
 import com.tsd.ascanner.data.printer.TscPrinterService
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.padding
@@ -155,6 +156,7 @@ class MainActivity : ComponentActivity() {
 				var dialogSending by remember { mutableStateOf(false) }
 				var currentPrintRequest by remember { mutableStateOf<ServerPrintRequest?>(null) }
 				var showPrinterDialog by remember { mutableStateOf(false) }
+				var showAutoPrintDialog by remember { mutableStateOf(false) }
 				var globalSelect by remember { mutableStateOf<ServerSelect?>(null) }
 				var globalDialogNum by remember { mutableStateOf<ServerDialogNum?>(null) }
 				var dialogNumSending by remember { mutableStateOf(false) }
@@ -182,8 +184,13 @@ class MainActivity : ComponentActivity() {
 				LaunchedEffect(Unit) {
 					PrintBus.events.collectLatest { printRequest ->
 						currentPrintRequest = printRequest
-						// Always show printer selection dialog. Printing must be user-confirmed.
-						showPrinterDialog = true
+						if (printRequest.autoPrint) {
+							showAutoPrintDialog = true
+							showPrinterDialog = false
+						} else {
+							showPrinterDialog = true
+							showAutoPrintDialog = false
+						}
 					}
 				}
 				LaunchedEffect(Unit) {
@@ -739,6 +746,33 @@ class MainActivity : ComponentActivity() {
 								}
 							}
 						}
+
+						// Global auto-print overlay (for MessageType="print" with PrintDialog="0")
+						AutoPrintOverlay(
+							visible = showAutoPrintDialog,
+							printRequest = currentPrintRequest,
+							app = app,
+							onPrintSuccess = {
+								val req = currentPrintRequest
+								showAutoPrintDialog = false
+								currentPrintRequest = null
+								
+								// Process SelectOnExit
+								if (req != null && req.selectOnExit.isNotBlank()) {
+									SelectBus.emit(
+										com.tsd.ascanner.utils.ServerSelectRequest(
+											form = req.form,
+											formId = req.formId,
+											barcode = req.selectOnExit
+										)
+									)
+								}
+							},
+							onFallbackToManual = {
+								showAutoPrintDialog = false
+								showPrinterDialog = true
+							}
+						)
 
 						// Global printer dialog (for MessageType="print")
 						PrinterDialog(
