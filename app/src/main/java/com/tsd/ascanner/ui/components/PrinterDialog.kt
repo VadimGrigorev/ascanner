@@ -51,6 +51,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.DialogProperties
@@ -90,6 +91,8 @@ fun PrinterDialog(
     var pairedDevices by remember { mutableStateOf<List<BluetoothDevice>>(emptyList()) }
     var isLoading by remember { mutableStateOf(false) }
     var printResult by remember { mutableStateOf<String?>(null) }
+    var isPrinting by remember { mutableStateOf(false) }
+    var printProgress by remember { mutableStateOf("") }
     var hasPermissions by remember { mutableStateOf(printerService.hasBluetoothPermissions()) }
 	var bluetoothEnabled by remember { mutableStateOf(printerService.isBluetoothEnabled()) }
 
@@ -158,22 +161,32 @@ fun PrinterDialog(
     // Print from server request
     fun printFromRequest() {
         if (printRequest == null) return
+        
         scope.launch {
-            isLoading = true
+            isPrinting = true
             printResult = null
-            val success = printerService.printFromBase64(
-                printRequest.pictureBase64,
-                printRequest.paperWidthMm,
-                printRequest.paperHeightMm,
-                printRequest.copies
+            printProgress = "Печать 1 из ${printRequest.items.size}..."
+            
+            val result = printerService.smartPrintBatch(
+                items = printRequest.items,
+                onProgress = { current, total ->
+                    printProgress = "Печать $current из $total..."
+                }
             )
-            if (success) {
-                printResult = "Напечатано"
-                isLoading = false
-                onPrintSuccess()
-            } else {
-                printResult = "Ошибка печати"
-                isLoading = false
+            
+            isPrinting = false
+            
+            when (result) {
+                is TscPrinterService.PrintResult.Success -> {
+                    printResult = "Успешно напечатано (${printRequest.items.size} шт.)"
+                    onPrintSuccess()
+                }
+                is TscPrinterService.PrintResult.Error -> {
+                    printResult = result.message
+                }
+                is TscPrinterService.PrintResult.NeedPrinterSelection -> {
+                    printResult = "Принтер не подключен"
+                }
             }
         }
     }
@@ -264,23 +277,12 @@ fun PrinterDialog(
                             // Print from server request
                             Button(
                                 onClick = { printFromRequest() },
-                                modifier = Modifier.fillMaxWidth(),
-                                enabled = !isLoading,
-                                colors = ButtonDefaults.buttonColors(
-                                    containerColor = colors.primary
-                                )
+                                modifier = Modifier.fillMaxWidth().height(56.dp),
+                                enabled = connectionState == TscPrinterService.ConnectionState.CONNECTED && !isPrinting
                             ) {
-                                if (isLoading) {
-                                    CircularProgressIndicator(
-                                        modifier = Modifier.size(20.dp),
-                                        color = Color.White,
-                                        strokeWidth = 2.dp
-                                    )
-                                } else {
-                                    Icon(Icons.Default.Print, contentDescription = null)
-                                }
-                                Spacer(Modifier.width(8.dp))
-                                Text("Печать (${printRequest.copies} шт.)")
+                                Icon(Icons.Default.Print, contentDescription = null)
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(if (isPrinting) printProgress else "Печать (${printRequest.items.size} шт.)")
                             }
                         } else {
                             // Test print button (no server request)
@@ -447,22 +449,15 @@ fun PrinterDialog(
                 }
                 
                 // Print result message
-                printResult?.let { result ->
-                    Spacer(Modifier.height(8.dp))
-                    Card(
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = CardDefaults.cardColors(
-                            containerColor = if (result.contains("Ошибка")) Color(0xFFFFEBEE) else Color(0xFFE8F5E9)
-                        ),
-                        shape = RoundedCornerShape(8.dp)
-                    ) {
-                        Text(
-                            text = result,
-                            modifier = Modifier.padding(12.dp),
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = if (result.contains("Ошибка")) Color(0xFFC62828) else Color(0xFF2E7D32)
-                        )
-                    }
+                if (printResult != null) {
+                    Text(
+                        text = printResult!!,
+                        color = if (printResult == "Напечатано" || printResult == "Bitmap отправлен на печать" || printResult?.startsWith("Успешно") == true) 
+                            MaterialTheme.colorScheme.primary 
+                        else MaterialTheme.colorScheme.error,
+                        modifier = Modifier.padding(top = 16.dp).fillMaxWidth(),
+                        textAlign = TextAlign.Center
+                    )
                 }
             }
         },
