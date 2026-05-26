@@ -240,29 +240,64 @@ class ApiClient(
 				}
 				if (mt != null && mt.equals("print", ignoreCase = true)) {
 					val formId = if (obj.has("FormId")) obj.get("FormId").asString else ""
-					val picture = if (obj.has("Picture")) obj.get("Picture").asString else ""
-					val pictureType = if (obj.has("PictureType")) obj.get("PictureType").asString else "bmp"
-					val paperWidth = if (obj.has("PaperWidth")) {
-						obj.get("PaperWidth").asString.toFloatOrNull() ?: 50f
-					} else 50f
-					val paperHeight = if (obj.has("PaperHeight")) {
-						obj.get("PaperHeight").asString.toFloatOrNull() ?: 30f
-					} else 30f
-					val copies = if (obj.has("PrintCopies")) {
-						obj.get("PrintCopies").asString.toIntOrNull() ?: 1
-					} else 1
 					val selectOnExit = if (obj.has("SelectOnExit")) obj.get("SelectOnExit").asString else ""
 					
-					if (picture.isNotBlank()) {
+					val itemsList = mutableListOf<com.tsd.ascanner.utils.PrintItem>()
+					
+					// Root-level defaults
+					val rootPaperWidth = if (obj.has("PaperWidth")) obj.get("PaperWidth").asString.toFloatOrNull() ?: 50f else 50f
+					val rootPaperHeight = if (obj.has("PaperHeight")) obj.get("PaperHeight").asString.toFloatOrNull() ?: 30f else 30f
+					val rootCopies = if (obj.has("PrintCopies")) obj.get("PrintCopies").asString.toIntOrNull() ?: 1 else 1
+					val rootPictureType = if (obj.has("PictureType")) obj.get("PictureType").asString else "bmp"
+					val rootCompression = if (obj.has("Compression")) obj.get("Compression").asString else ""
+					
+					if (obj.has("Items") && obj.get("Items").isJsonArray) {
+						val itemsArray = obj.getAsJsonArray("Items")
+						for (i in 0 until itemsArray.size()) {
+							val itemObj = itemsArray.get(i).asJsonObject
+							val picture = if (itemObj.has("Picture")) itemObj.get("Picture").asString else ""
+							if (picture.isNotBlank()) {
+								val paperWidth = if (itemObj.has("PaperWidth")) itemObj.get("PaperWidth").asString.toFloatOrNull() ?: rootPaperWidth else rootPaperWidth
+								val paperHeight = if (itemObj.has("PaperHeight")) itemObj.get("PaperHeight").asString.toFloatOrNull() ?: rootPaperHeight else rootPaperHeight
+								val copies = if (itemObj.has("PrintCopies")) itemObj.get("PrintCopies").asString.toIntOrNull() ?: rootCopies else rootCopies
+								val pictureType = if (itemObj.has("PictureType")) itemObj.get("PictureType").asString else rootPictureType
+								val compression = if (itemObj.has("Compression")) itemObj.get("Compression").asString else rootCompression
+								
+								itemsList.add(
+									com.tsd.ascanner.utils.PrintItem(
+										pictureBase64 = picture,
+										pictureType = pictureType,
+										paperWidthMm = paperWidth,
+										paperHeightMm = paperHeight,
+										copies = copies,
+										compression = compression
+									)
+								)
+							}
+						}
+					} else {
+						// Fallback for single item
+						val picture = if (obj.has("Picture")) obj.get("Picture").asString else ""
+						if (picture.isNotBlank()) {
+							itemsList.add(
+								com.tsd.ascanner.utils.PrintItem(
+									pictureBase64 = picture,
+									pictureType = rootPictureType,
+									paperWidthMm = rootPaperWidth,
+									paperHeightMm = rootPaperHeight,
+									copies = rootCopies,
+									compression = rootCompression
+								)
+							)
+						}
+					}
+					
+					if (itemsList.isNotEmpty()) {
 						PrintBus.emit(
-							ServerPrintRequest(
+							com.tsd.ascanner.utils.ServerPrintRequest(
 								form = form ?: "",
 								formId = formId,
-								pictureBase64 = picture,
-								pictureType = pictureType,
-								paperWidthMm = paperWidth,
-								paperHeightMm = paperHeight,
-								copies = copies,
+								items = itemsList,
 								selectOnExit = selectOnExit
 							)
 						)
