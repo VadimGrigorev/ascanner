@@ -42,6 +42,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.tsd.ascanner.AScannerApp
@@ -113,6 +114,7 @@ fun TasksScreen(
     var loadingOrderId by remember { mutableStateOf<String?>(null) }
 	var searchFocused by remember { mutableStateOf(false) }
     var showCamera by remember { mutableStateOf(false) }
+    var showExitDialog by remember { mutableStateOf(false) }
     val listState = rememberLazyListState()
 	var bottomActionsHeightPx by remember { mutableStateOf(0) }
 	val density = LocalDensity.current
@@ -279,7 +281,10 @@ fun TasksScreen(
 		// Filter tasks/orders by open/closed and search query
 		val q = if (vm.isSearchAvailable) vm.searchQuery.trim().lowercase() else ""
 		val filteredTasks = vm.tasks.mapNotNull { t ->
-			val baseOrders = if (!vm.showOnlyOpen) t.orders else t.orders.filter { (it.status ?: "").lowercase() != "closed" }
+            val baseOrders = if (!vm.showOnlyOpen) t.orders else t.orders.filter { 
+				val s = (it.status ?: "").lowercase()
+				s != "closed" && s != "warning"
+			}
 			if (q.isEmpty()) {
 				if (baseOrders.isNotEmpty()) t.copy(orders = baseOrders) else null
 			} else {
@@ -567,10 +572,44 @@ fun TasksScreen(
             modifier = Modifier.align(Alignment.CenterStart),
             itemColors = taskColors
         )
+
+        if (showExitDialog) {
+            androidx.compose.material3.AlertDialog(
+                onDismissRequest = { showExitDialog = false },
+                title = { Text("Выйти?", color = colors.textPrimary) },
+                text = { Text("Вернуться на страницу авторизации?", color = colors.textPrimary) },
+                containerColor = colors.background,
+                confirmButton = {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceEvenly
+                    ) {
+                        androidx.compose.material3.TextButton(
+                            modifier = Modifier.weight(1f).padding(horizontal = 8.dp),
+                            onClick = { showExitDialog = false }
+                        ) {
+                            Text("Нет", color = colors.textPrimary, fontSize = 18.sp)
+                        }
+                        androidx.compose.material3.TextButton(
+                            modifier = Modifier.weight(1f).padding(horizontal = 8.dp),
+                            onClick = {
+                                showExitDialog = false
+                                app.appScope.launch {
+                                    runCatching { app.authService.logout() }
+                                }
+                                com.tsd.ascanner.utils.AppEventBus.requireLogin()
+                            }
+                        ) {
+                            Text("Да", color = colors.textPrimary, fontSize = 18.sp)
+                        }
+                    }
+                }
+            )
+        }
     }
 
     val activity = context as? ComponentActivity
-    BackHandler { activity?.finish() }
+    BackHandler { showExitDialog = true }
 }
 
 
