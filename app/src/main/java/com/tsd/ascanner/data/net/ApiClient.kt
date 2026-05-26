@@ -251,6 +251,9 @@ class ApiClient(
 					val rootPictureType = if (obj.has("PictureType")) obj.get("PictureType").asString else "bmp"
 					val rootCompression = if (obj.has("Compression")) obj.get("Compression").asString else ""
 					
+					val printDialogVal = if (obj.has("PrintDialog")) obj.get("PrintDialog").asString else "1"
+					val autoPrint = printDialogVal == "0"
+					
 					if (obj.has("Items") && obj.get("Items").isJsonArray) {
 						val itemsArray = obj.getAsJsonArray("Items")
 						for (i in 0 until itemsArray.size()) {
@@ -298,7 +301,8 @@ class ApiClient(
 								form = form ?: "",
 								formId = formId,
 								items = itemsList,
-								selectOnExit = selectOnExit
+								selectOnExit = selectOnExit,
+								autoPrint = autoPrint
 							)
 						)
 					}

@@ -22,5 +22,6 @@ data class ServerPrintRequest(
     val form: String,
     val formId: String,
     val items: List<PrintItem>,
-    val selectOnExit: String = ""
+    val selectOnExit: String = "",
+    val autoPrint: Boolean = false
 )
