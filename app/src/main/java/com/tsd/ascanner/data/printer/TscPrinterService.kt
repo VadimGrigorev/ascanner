@@ -29,6 +29,7 @@ import java.io.IOException
 import java.io.OutputStream
 import java.util.UUID
 import java.util.zip.GZIPInputStream
+import com.tsd.ascanner.utils.PrintItem
 
 /**
  * Service for communicating with TSC RE310 label printer via Bluetooth.
@@ -914,5 +915,59 @@ class TscPrinterService(private val context: Context) {
      */
     fun clearError() {
         _lastError.value = null
+    }
+
+    /**
+     * Smart print a batch of items - automatically connects to last printer if needed.
+     * Processes each item sequentially. Aborts on first error.
+     * Supports gzip compression for the Base64 image.
+     */
+    suspend fun smartPrintBatch(
+        items: List<PrintItem>,
+        onProgress: (Int, Int) -> Unit
+    ): PrintResult {
+        if (connectionState.value != ConnectionState.CONNECTED) {
+            val connected = tryAutoConnect()
+            if (!connected) {
+                Log.d(TAG, "smartPrintBatch: auto-connect failed, need printer selection")
+                return PrintResult.NeedPrinterSelection
+            }
+        }
+
+        val total = items.size
+        for ((index, item) in items.withIndex()) {
+            try {
+                var base64Data = item.pictureBase64
+                
+                // Handle gzip compression
+                if (item.compression.equals("gzip", ignoreCase = true)) {
+                    val compressedBytes = android.util.Base64.decode(base64Data, android.util.Base64.DEFAULT)
+                    val gis = GZIPInputStream(ByteArrayInputStream(compressedBytes))
+                    val decompressedBytes = gis.readBytes()
+                    base64Data = android.util.Base64.encodeToString(decompressedBytes, android.util.Base64.DEFAULT)
+                }
+
+                val success = printFromBase64(
+                    base64Data,
+                    item.paperWidthMm,
+                    item.paperHeightMm,
+                    item.copies
+                )
+
+                if (!success) {
+                    val error = lastError.value ?: "Unknown error on label ${index + 1}"
+                    Log.e(TAG, "smartPrintBatch: print failed at index $index - $error")
+                    return PrintResult.Error("Ошибка печати этикетки ${index + 1} из $total: $error")
+                }
+                
+                onProgress(index + 1, total)
+            } catch (e: Exception) {
+                Log.e(TAG, "smartPrintBatch: exception at index $index", e)
+                return PrintResult.Error("Ошибка обработки этикетки ${index + 1} из $total: ${e.message}")
+            }
+        }
+
+        Log.d(TAG, "smartPrintBatch: all prints successful")
+        return PrintResult.Success
     }
 }
