@@ -28,7 +28,6 @@ import androidx.compose.ui.window.DialogProperties
 import com.tsd.ascanner.AScannerApp
 import com.tsd.ascanner.data.printer.TscPrinterService
 import com.tsd.ascanner.utils.ServerPrintRequest
-import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 
 @Composable
@@ -43,11 +42,10 @@ fun AutoPrintOverlay(
 
     val printerService = app.printerService
     var printProgress by remember { mutableStateOf("Подключение к принтеру...") }
-    var printJob by remember { mutableStateOf<Job?>(null) }
 
     LaunchedEffect(printRequest) {
         printProgress = "Подключение к принтеру..."
-        printJob = launch {
+        launch {
             val result = printerService.smartPrintBatch(
                 items = printRequest.items,
                 onProgress = { current, total ->
@@ -101,7 +99,6 @@ fun AutoPrintOverlay(
                 
                 Button(
                     onClick = {
-                        printJob?.cancel()
                         onFallbackToManual()
                     },
                     modifier = Modifier.fillMaxWidth(),

@@ -759,13 +759,13 @@ class MainActivity : ComponentActivity() {
 								
 								// Process SelectOnExit
 								if (req != null && req.selectOnExit.isNotBlank()) {
-									SelectBus.emit(
-										com.tsd.ascanner.utils.ServerSelectRequest(
+									scope.launch {
+										app.docsService.sendSelect(
 											form = req.form,
 											formId = req.formId,
-											barcode = req.selectOnExit
+											selectedId = req.selectOnExit
 										)
-									)
+									}
 								}
 							},
 							onFallbackToManual = {

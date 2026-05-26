@@ -952,6 +952,7 @@ class TscPrinterService(private val context: Context) {
                 
                 onProgress(index + 1, total)
             } catch (e: Exception) {
+                if (e is kotlinx.coroutines.CancellationException) throw e
                 Log.e(TAG, "smartPrintBatch: exception at index $index", e)
                 return@withContext PrintResult.Error("Ошибка обработки этикетки ${index + 1} из $total: ${e.message}")
             }
