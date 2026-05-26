@@ -925,30 +925,20 @@ class TscPrinterService(private val context: Context) {
     suspend fun smartPrintBatch(
         items: List<PrintItem>,
         onProgress: (Int, Int) -> Unit
-    ): PrintResult {
+    ): PrintResult = withContext(Dispatchers.IO) {
         if (connectionState.value != ConnectionState.CONNECTED) {
             val connected = tryAutoConnect()
             if (!connected) {
                 Log.d(TAG, "smartPrintBatch: auto-connect failed, need printer selection")
-                return PrintResult.NeedPrinterSelection
+                return@withContext PrintResult.NeedPrinterSelection
             }
         }
 
         val total = items.size
         for ((index, item) in items.withIndex()) {
             try {
-                var base64Data = item.pictureBase64
-                
-                // Handle gzip compression
-                if (item.compression.equals("gzip", ignoreCase = true)) {
-                    val compressedBytes = android.util.Base64.decode(base64Data, android.util.Base64.DEFAULT)
-                    val gis = GZIPInputStream(ByteArrayInputStream(compressedBytes))
-                    val decompressedBytes = gis.readBytes()
-                    base64Data = android.util.Base64.encodeToString(decompressedBytes, android.util.Base64.DEFAULT)
-                }
-
                 val success = printFromBase64(
-                    base64Data,
+                    item.pictureBase64,
                     item.paperWidthMm,
                     item.paperHeightMm,
                     item.copies
@@ -957,17 +947,17 @@ class TscPrinterService(private val context: Context) {
                 if (!success) {
                     val error = lastError.value ?: "Unknown error on label ${index + 1}"
                     Log.e(TAG, "smartPrintBatch: print failed at index $index - $error")
-                    return PrintResult.Error("Ошибка печати этикетки ${index + 1} из $total: $error")
+                    return@withContext PrintResult.Error("Ошибка печати этикетки ${index + 1} из $total: $error")
                 }
                 
                 onProgress(index + 1, total)
             } catch (e: Exception) {
                 Log.e(TAG, "smartPrintBatch: exception at index $index", e)
-                return PrintResult.Error("Ошибка обработки этикетки ${index + 1} из $total: ${e.message}")
+                return@withContext PrintResult.Error("Ошибка обработки этикетки ${index + 1} из $total: ${e.message}")
             }
         }
 
         Log.d(TAG, "smartPrintBatch: all prints successful")
-        return PrintResult.Success
+        return@withContext PrintResult.Success
     }
 }
