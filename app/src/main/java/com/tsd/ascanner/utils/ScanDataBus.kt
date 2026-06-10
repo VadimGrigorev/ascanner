@@ -5,7 +5,7 @@ import kotlinx.coroutines.flow.asSharedFlow
 
 /**
  * Centralized bus for barcode/QR scan results delivered via intent-based
- * scanning (DataWedge, Newland broadcasts). Screens collect [scans] to
+ * scanning (DataWedge, Newland, Urovo broadcasts). Screens collect [scans] to
  * handle incoming barcodes without relying on keyboard-wedge input.
  */
 object ScanDataBus {

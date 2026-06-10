@@ -31,6 +31,7 @@ import android.content.IntentFilter
 import android.view.KeyEvent
 import com.tsd.ascanner.utils.DataWedge
 import com.tsd.ascanner.utils.Newland
+import com.tsd.ascanner.utils.Urovo
 import com.tsd.ascanner.utils.KeyboardWedgeInterceptor
 import com.tsd.ascanner.utils.ScanDataBus
 import com.tsd.ascanner.utils.ScannerSettings
@@ -121,6 +122,7 @@ class MainActivity : ComponentActivity() {
             intent ?: return
             val barcode = DataWedge.parseScanData(intent)
                 ?: Newland.parseScanData(intent)
+                ?: Urovo.parseScanData(intent)
                 ?: return
             ScanDataBus.emit(barcode)
         }
@@ -137,6 +139,7 @@ class MainActivity : ComponentActivity() {
         val scanFilter = IntentFilter().apply {
             addAction(DataWedge.SCAN_ACTION)
             addAction(Newland.SCAN_RESULT_ACTION)
+            addAction(Urovo.SCAN_ACTION)
         }
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
             registerReceiver(scanReceiver, scanFilter, RECEIVER_EXPORTED)
