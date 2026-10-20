@@ -319,7 +319,7 @@ fun LoginScreen(
 			.padding(16.dp)
 	) {
 		Text(
-			text = "2.7 версия",
+			text = "2.8 версия",
 			modifier = Modifier.align(Alignment.BottomStart),
 			color = colors.textSecondary
 		)
