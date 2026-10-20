@@ -44,13 +44,23 @@ class ApiClient(
 
 	companion object {
 		private const val DEBUG_LOGS = true
+		const val DEFAULT_COMMON_TIMEOUT_SECONDS = 10L
+		const val DEFAULT_SCAN_TIMEOUT_SECONDS = 10L
 	}
+
+    @Volatile
+    var commonTimeoutSeconds: Long = DEFAULT_COMMON_TIMEOUT_SECONDS
+        private set
+
+    @Volatile
+    var scanTimeoutSeconds: Long = DEFAULT_SCAN_TIMEOUT_SECONDS
+        private set
 
     private val JSON_MEDIA_TYPE = "application/json; charset=utf-8".toMediaType()
 
     private val client: OkHttpClient = OkHttpClient.Builder()
         .connectTimeout(5, TimeUnit.SECONDS)
-        .readTimeout(10, TimeUnit.SECONDS)
+        .readTimeout(DEFAULT_COMMON_TIMEOUT_SECONDS, TimeUnit.SECONDS)
         .writeTimeout(5, TimeUnit.SECONDS)
         .retryOnConnectionFailure(true)
         .connectionPool(ConnectionPool(5, 30, TimeUnit.SECONDS))
@@ -59,11 +69,34 @@ class ApiClient(
         }
         .build()
 
+    fun updateTimeouts(commonTimeoutSec: Long?, scanTimeoutSec: Long?) {
+        if (commonTimeoutSec != null && commonTimeoutSec > 0) {
+            commonTimeoutSeconds = commonTimeoutSec
+        }
+        if (scanTimeoutSec != null && scanTimeoutSec > 0) {
+            scanTimeoutSeconds = scanTimeoutSec
+        }
+        if (DEBUG_LOGS) {
+            Log.d(
+                "ApiClient",
+                "Timeouts updated: commonTimeout=${commonTimeoutSeconds}s, scanTimeout=${scanTimeoutSeconds}s"
+            )
+        }
+    }
+
+    private fun clientForRequest(isScanRequest: Boolean): OkHttpClient {
+        val readTimeoutSec = if (isScanRequest) scanTimeoutSeconds else commonTimeoutSeconds
+        return client.newBuilder()
+            .readTimeout(readTimeoutSec, TimeUnit.SECONDS)
+            .build()
+    }
+
     suspend fun <T> postAndParse(
 		path: String,
 		body: Any,
 		responseClass: Class<T>,
-		logRequest: Boolean = false
+		logRequest: Boolean = false,
+		isScanRequest: Boolean = false
 	): T =
         withContext(Dispatchers.IO) {
             val url = composeUrl(path)
@@ -81,7 +114,7 @@ class ApiClient(
                 .header("Accept", "application/json")
                 .build()
 
-            client.newCall(request).execute().use { response ->
+            clientForRequest(isScanRequest).newCall(request).execute().use { response ->
                 val responseText = response.body?.string() ?: ""
                 val code = response.code
                 if (DEBUG_LOGS && logRequest) {
@@ -104,7 +137,8 @@ class ApiClient(
     suspend fun postForJsonElement(
 		path: String,
 		body: Any,
-		logRequest: Boolean = false
+		logRequest: Boolean = false,
+		isScanRequest: Boolean = false
 	): com.google.gson.JsonElement =
         withContext(Dispatchers.IO) {
             val url = composeUrl(path)
@@ -122,7 +156,7 @@ class ApiClient(
                 .header("Accept", "application/json")
                 .build()
 
-            client.newCall(request).execute().use { response ->
+            clientForRequest(isScanRequest).newCall(request).execute().use { response ->
                 val responseText = response.body?.string() ?: ""
                 val code = response.code
                 if (DEBUG_LOGS && logRequest) {

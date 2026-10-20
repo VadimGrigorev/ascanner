@@ -37,6 +37,7 @@ class AuthService(
 		}
         return if (resp.messageType?.equals("login", ignoreCase = true) == true && !resp.bearer.isNullOrBlank()) {
             bearer = resp.bearer
+            applyTimeoutsFromLogin(resp)
             LoginResult.Success(resp.bearer!!)
         } else {
             val msg = resp.message ?: "Ошибка авторизации"
@@ -46,7 +47,7 @@ class AuthService(
 
     suspend fun scanLogin(text: String): LoginResult {
         val req = LoginScanRequest(text = text)
-		val element = apiClient.postForJsonElement("/scanlogin", req, logRequest = true)
+		val element = apiClient.postForJsonElement("/scanlogin", req, logRequest = true, isScanRequest = true)
         val obj = element.asJsonObject
         val messageType = if (obj.has("MessageType")) obj.get("MessageType").asString else null
 		if (messageType != null && messageType.equals("dialog", ignoreCase = true)) {
@@ -62,10 +63,29 @@ class AuthService(
 		}
         return if (resp.messageType?.equals("login", ignoreCase = true) == true && !resp.bearer.isNullOrBlank()) {
             bearer = resp.bearer
+            applyTimeoutsFromLogin(resp)
             LoginResult.Success(resp.bearer!!)
         } else {
             LoginResult.Error(resp.message ?: "Ошибка авторизации")
         }
+    }
+
+    private fun applyTimeoutsFromLogin(resp: LoginResponse) {
+        val commonSec = parseTimeoutSeconds(resp.commonTimeout)
+        val scanSec = parseTimeoutSeconds(resp.scanTimeout)
+        if (commonSec != null || scanSec != null) {
+            apiClient.updateTimeouts(
+                commonTimeoutSec = commonSec,
+                scanTimeoutSec = scanSec
+            )
+        }
+    }
+
+    private fun parseTimeoutSeconds(raw: String?): Long? {
+        val trimmed = raw?.trim() ?: return null
+        if (trimmed.isEmpty()) return null
+        return trimmed.toLongOrNull()?.takeIf { it > 0 }
+            ?: trimmed.toDoubleOrNull()?.toLong()?.takeIf { it > 0 }
     }
 
     // Fire-and-forget logout to inform server; does not clear local bearer

@@ -26,7 +26,11 @@ data class LoginRequest(
 data class LoginResponse(
     @SerializedName("MessageType") val messageType: String? = null,
     @SerializedName("Bearer") val bearer: String? = null,
-    @SerializedName("Message") val message: String? = null
+    @SerializedName("Message") val message: String? = null,
+    @SerializedName(value = "scanTimeout", alternate = ["ScanTimeout", "scantimeout", "SCANTIMEOUT", "ScanTimeOut", "scanTimeOut"])
+    val scanTimeout: String? = null,
+    @SerializedName(value = "commonTimeout", alternate = ["CommonTimeout", "commontimeout", "COMMONTIMEOUT", "CommonTimeOut", "commonTimeOut"])
+    val commonTimeout: String? = null
 )
 
 data class LoginScanRequest(

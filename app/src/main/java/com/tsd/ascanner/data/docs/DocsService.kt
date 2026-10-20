@@ -201,7 +201,7 @@ class DocsService(
     suspend fun scanDocList(text: String): ScanDocResult {
         val bearer = authService.bearer ?: throw IllegalStateException("Нет токена авторизации")
         val req = DocScanRequest(bearer = bearer, text = text)
-        val element = apiClient.postForJsonElement("/scanlist", req, logRequest = true)
+        val element = apiClient.postForJsonElement("/scanlist", req, logRequest = true, isScanRequest = true)
         val obj = element.asJsonObject
         val messageType = if (obj.has("MessageType")) obj.get("MessageType").asString else null
 		if (messageType != null && (messageType.equals("dialog", ignoreCase = true) || messageType.equals("dialognum", ignoreCase = true))) {
@@ -244,7 +244,7 @@ class DocsService(
     suspend fun scanMark(formId: String, text: String): ScanDocResult {
         val bearer = authService.bearer ?: throw IllegalStateException("Нет токена авторизации")
         val req = DocScan2Request(bearer = bearer, formId = formId, text = text)
-        val element = apiClient.postForJsonElement("/scan", req, logRequest = true)
+        val element = apiClient.postForJsonElement("/scan", req, logRequest = true, isScanRequest = true)
         val obj = element.asJsonObject
 	    val messageType = if (obj.has("MessageType")) obj.get("MessageType").asString else null
 		if (messageType != null && (messageType.equals("dialog", ignoreCase = true) || messageType.equals("dialognum", ignoreCase = true))) {
@@ -302,7 +302,7 @@ class DocsService(
     suspend fun scanPosMark(formId: String, text: String): ScanPosResult {
         val bearer = authService.bearer ?: throw IllegalStateException("Нет токена авторизации")
         val req = DocScan2Request(bearer = bearer, form = "pos", formId = formId, text = text)
-        val element = apiClient.postForJsonElement("/scanone", req, logRequest = true)
+        val element = apiClient.postForJsonElement("/scanone", req, logRequest = true, isScanRequest = true)
         val obj = element.asJsonObject
         val messageType = if (obj.has("MessageType")) obj.get("MessageType").asString else null
 		if (messageType != null && (messageType.equals("dialog", ignoreCase = true) || messageType.equals("dialognum", ignoreCase = true))) {
@@ -441,7 +441,7 @@ class DocsService(
 		val bearer = authService.bearer ?: return ButtonResult.Error("Нет токена авторизации")
 		val req = SelectScanRequest(bearer = bearer, form = form, formId = formId, text = text)
 		return try {
-			val element = apiClient.postForJsonElement("/scan", req, logRequest = true)
+			val element = apiClient.postForJsonElement("/scan", req, logRequest = true, isScanRequest = true)
 			if (!element.isJsonObject) return ButtonResult.Success
 			val obj = element.asJsonObject
 			val messageType = if (obj.has("MessageType")) obj.get("MessageType").asString else null
