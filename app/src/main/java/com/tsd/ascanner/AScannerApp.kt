@@ -5,6 +5,7 @@ import com.tsd.ascanner.data.net.ApiClient
 import com.tsd.ascanner.data.auth.AuthService
 import com.tsd.ascanner.data.docs.DocsService
 import com.tsd.ascanner.data.printer.TscPrinterService
+import com.tsd.ascanner.utils.ServerSoundPlayer
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -33,7 +34,8 @@ class AScannerApp : Application() {
     override fun onCreate() {
         super.onCreate()
 		instance = this
-        apiClient = ApiClient()
+        val soundPlayer = ServerSoundPlayer(this)
+        apiClient = ApiClient(onSound = soundPlayer::play)
         authService = AuthService(apiClient)
         docsService = DocsService(apiClient, authService)
         printerService = TscPrinterService(this)

@@ -319,7 +319,7 @@ fun LoginScreen(
 			.padding(16.dp)
 	) {
 		Text(
-			text = "2.8 версия",
+			text = "${com.tsd.ascanner.BuildConfig.VERSION_NAME} версия",
 			modifier = Modifier.align(Alignment.BottomStart),
 			color = colors.textSecondary
 		)

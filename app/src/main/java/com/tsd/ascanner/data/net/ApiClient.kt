@@ -36,7 +36,8 @@ import java.net.Proxy
 import java.util.concurrent.TimeUnit
 
 class ApiClient(
-    private val gson: Gson = Gson()
+    private val gson: Gson = Gson(),
+    private val onSound: (String) -> Unit = {}
 ) {
     private val prettyGson: Gson = com.google.gson.GsonBuilder()
         .setPrettyPrinting()
@@ -178,6 +179,16 @@ class ApiClient(
             val element = gson.fromJson(responseText, com.google.gson.JsonElement::class.java)
             if (element != null && element.isJsonObject) {
                 val obj = element.asJsonObject
+                // Sound is an optional side effect, independent of the response type.
+                // Ignore malformed values and playback failures without changing routing/errors.
+                val sound = obj.get("Sound")
+                if (sound != null && sound.isJsonPrimitive && sound.asJsonPrimitive.isString) {
+                    try {
+                        onSound(sound.asString)
+                    } catch (e: Exception) {
+                        Log.w("ApiClient", "Unable to dispatch server sound", e)
+                    }
+                }
                 val mt = if (obj.has("MessageType")) obj.get("MessageType").asString else null
 				val form = if (obj.has("Form")) obj.get("Form").asString else null
 				if (mt != null && mt.equals("dialog", ignoreCase = true)) {
