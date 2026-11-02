@@ -7,15 +7,17 @@ import android.os.Handler
 import android.os.Looper
 import android.util.Log
 import com.tsd.ascanner.R
+import java.util.Locale
 
 /** One app-lifetime player. All playback state is confined to the main thread. */
 class ServerSoundPlayer(context: Context) {
     private val handler = Handler(Looper.getMainLooper())
     private var pool: SoundPool? = null
-    private var errorSoundId = 0
+    private val soundIds = mutableMapOf<String, Int>()
+    private val readySoundIds = mutableSetOf<Int>()
+    private val failedSoundIds = mutableSetOf<Int>()
     private var streamId = 0
-    private var ready = false
-    private var pendingError = false
+    private var pendingSoundName: String? = null
 
     init {
         val appContext = context.applicationContext
@@ -34,37 +36,48 @@ class ServerSoundPlayer(context: Context) {
                 soundPool.setOnLoadCompleteListener { _, sampleId, status ->
                     handler.post {
                         safely {
-                            if (sampleId == errorSoundId) {
-                                ready = status == 0
-                                if (!ready) {
-                                    Log.w("ServerSoundPlayer", "Error sound failed to load: $status")
-                                }
-                                val shouldPlay = ready && pendingError
-                                pendingError = false
-                                if (shouldPlay) playError()
+                            if (status == 0) {
+                                readySoundIds.add(sampleId)
+                            } else {
+                                failedSoundIds.add(sampleId)
+                                Log.w("ServerSoundPlayer", "Sound $sampleId failed to load: $status")
+                            }
+                            if (soundIds[pendingSoundName] == sampleId) {
+                                pendingSoundName = null
+                                if (status == 0) playSample(sampleId)
                             }
                         }
                     }
                 }
-                errorSoundId = soundPool.load(appContext, R.raw.error, 1)
+                soundIds["error1"] = soundPool.load(appContext, R.raw.error1, 1)
+                soundIds["error2"] = soundPool.load(appContext, R.raw.error2, 1)
+                soundIds["error3"] = soundPool.load(appContext, R.raw.error3, 1)
             }
         }
     }
 
     fun play(name: String) {
-        if (!name.trim().equals("error", ignoreCase = true)) return
+        val soundName = when (val normalized = name.trim().lowercase(Locale.ROOT)) {
+            "error" -> "error2" // Preserve the original server contract.
+            "error1", "error2", "error3" -> normalized
+            else -> return
+        }
         handler.post {
             safely {
-                if (ready) playError()
-                else if (errorSoundId != 0) pendingError = true
+                // Only the latest requested sound may play after asynchronous loading.
+                pendingSoundName = null
+                val sampleId = soundIds[soundName] ?: return@safely
+                if (sampleId == 0 || sampleId in failedSoundIds) return@safely
+                if (sampleId in readySoundIds) playSample(sampleId)
+                else pendingSoundName = soundName
             }
         }
     }
 
-    private fun playError() {
+    private fun playSample(sampleId: Int) {
         val soundPool = pool ?: return
         if (streamId != 0) soundPool.stop(streamId)
-        streamId = soundPool.play(errorSoundId, 1f, 1f, 1, 0, 1f)
+        streamId = soundPool.play(sampleId, 1f, 1f, 1, 0, 1f)
     }
 
     private inline fun safely(action: () -> Unit) {

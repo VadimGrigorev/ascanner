@@ -23,10 +23,10 @@ class ServerSoundPlaybackTest {
     fun loadAudioOnDevice() {
         player = ServerSoundPlayer(instrumentation.targetContext)
         val deadline = SystemClock.uptimeMillis() + 5000
-        while (!state<Boolean>("ready") && SystemClock.uptimeMillis() < deadline) {
+        while (state<Set<Int>>("readySoundIds").size < 3 && SystemClock.uptimeMillis() < deadline) {
             SystemClock.sleep(20)
         }
-        assertTrue("The MP3 must decode and load on this device", state("ready"))
+        assertEquals("All three MP3s must decode and load on this device", 3, state<Set<Int>>("readySoundIds").size)
     }
 
     @After
@@ -35,6 +35,22 @@ class ServerSoundPlaybackTest {
             val field = ServerSoundPlayer::class.java.getDeclaredField("pool")
             field.isAccessible = true
             (field.get(player) as? SoundPool)?.release()
+        }
+    }
+
+    @Test
+    fun allThreeServerSoundNamesPlayDistinctSamples() {
+        val client = ApiClient(onSound = player::play)
+        val ids = state<Map<String, Int>>("soundIds")
+        assertEquals(3, ids.values.toSet().size)
+        var previousStream = 0
+        for (name in listOf("error1", "error2", "error3")) {
+            process(client, """{"MessageType":"refresh","Sound":"$name"}""")
+            val stream = state<Int>("streamId")
+            assertTrue("$name must start playback", stream > 0)
+            assertNotEquals(previousStream, stream)
+            previousStream = stream
+            SystemClock.sleep(2100)
         }
     }
 
